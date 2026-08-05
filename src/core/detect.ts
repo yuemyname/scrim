@@ -27,6 +27,17 @@ export interface DetectorOptions {
 }
 
 export async function createDetector(opts: DetectorOptions): Promise<Detector> {
+  // WebKit(iPad Safari/Chrome)의 모듈 워커에는 importScripts가 아예 없다.
+  // tasks-vision 로더는 typeof importScripts로 워커 여부를 판단하므로, 없으면
+  // document.createElement 경로로 빠져 "Can't find variable: document"로 죽는다.
+  // TypeError를 던지는 폴리필을 깔아 올바른 폴백(dynamic import)으로 유도한다.
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g.importScripts !== 'function') {
+    g.importScripts = () => {
+      throw new TypeError('importScripts is unavailable in module workers');
+    };
+  }
+
   // FilesetResolver 대신 수동 fileset: 캐시 무효화 버전 쿼리를 경로에 붙이기 위함.
   // SIMD 변형만 쓴다 — 요구 브라우저(Safari 16.4+/Chrome 94+/Firefox 130+)는 전부 wasm SIMD 지원.
   const fileset = { wasmLoaderPath: WASM_LOADER_URL, wasmBinaryPath: WASM_BINARY_URL };
