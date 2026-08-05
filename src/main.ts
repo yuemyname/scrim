@@ -64,7 +64,7 @@ function buildTopbar(onOpen: (() => void) | null): HTMLElement {
   bar.appendChild(brand);
   if (onOpen) {
     const openBtn = document.createElement('button');
-    openBtn.textContent = '영상 열기';
+    openBtn.textContent = '영상·사진 열기';
     openBtn.addEventListener('click', onOpen);
     bar.appendChild(openBtn);
   }
@@ -367,10 +367,18 @@ class App {
     exportBtn.textContent = '내보내기';
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
+    // 내보내기는 상단바 우측, '영상·사진 열기' 오른쪽에 배치
+    const topRight = document.createElement('div');
+    topRight.className = 'topbar-right';
+    const openBtnEl = topbar.lastElementChild;
+    if (openBtnEl) topRight.appendChild(openBtnEl);
+    topRight.append(hazardCount, exportBtn);
+    topbar.appendChild(topRight);
+
     if (state.isImage) {
-      transport.append(undoBtn, redoBtn, addBoxBtn, spacer, hazardCount, exportBtn);
+      transport.append(undoBtn, redoBtn, addBoxBtn, spacer);
     } else {
-      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, cutBtn, spacer, hazardCount, exportBtn);
+      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, cutBtn, spacer);
     }
 
     const timeline = new Timeline(state);
