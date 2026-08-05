@@ -86,10 +86,35 @@ export class Player {
           this.overlay.width = this.video.videoWidth;
           this.overlay.height = this.video.videoHeight;
         }
+        this.fitToStage();
         this.requestDraw();
       },
       { once: true },
     );
+    // 스테이지 크기 변화에 맞춰 플레이어를 리핏 (세로 영상이 하단 바를 덮지 않게)
+    const stage = this.root.parentElement;
+    if (stage && !this.stageObserver) {
+      this.stageObserver = new ResizeObserver(() => this.fitToStage());
+      this.stageObserver.observe(stage);
+    }
+    this.fitToStage();
+  }
+
+  private stageObserver: ResizeObserver | null = null;
+
+  /** 영상 비율을 유지하며 스테이지 안에 꼭 맞게 플레이어 크기를 지정한다 */
+  private fitToStage(): void {
+    const stage = this.root.parentElement;
+    if (!stage) return;
+    const pad = 16;
+    const aw = stage.clientWidth - pad;
+    const ah = stage.clientHeight - pad;
+    const vw = this.overlay.width;
+    const vh = this.overlay.height;
+    if (aw <= 0 || ah <= 0 || vw <= 0 || vh <= 0) return;
+    const scale = Math.min(aw / vw, ah / vh);
+    this.root.style.width = `${Math.max(1, Math.floor(vw * scale))}px`;
+    this.root.style.height = `${Math.max(1, Math.floor(vh * scale))}px`;
   }
 
   togglePlay(): void {
