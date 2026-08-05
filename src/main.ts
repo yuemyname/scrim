@@ -174,6 +174,8 @@ class App {
 
       if (project.source.durationUs > LONG_VIDEO_WARN_US) {
         toast('5분이 넘는 영상입니다. 처리 시간이 길어질 수 있으니 구간을 나눠 작업하는 것을 권합니다.');
+      } else if (Math.max(project.source.width, project.source.height) > 2160) {
+        toast('4K 영상입니다. 내보낼 때 1080p로 다운스케일됩니다.');
       }
       this.renderReview();
     } catch (e) {

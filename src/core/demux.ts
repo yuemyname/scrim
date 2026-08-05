@@ -40,7 +40,8 @@ export class UnsupportedSourceError extends Error {
 }
 
 const READ_CHUNK = 8 * 1024 * 1024;
-const MAX_LONG_SIDE = 2160;
+/** 4K(3840×2160, DCI 4096 포함)까지 받는다. 4K 소스는 렌더 시 1080p로 다운스케일된다. */
+const MAX_LONG_SIDE = 4096;
 
 export async function demux(file: File): Promise<DemuxResult> {
   const mp4 = createFile();
@@ -113,8 +114,14 @@ export async function demux(file: File): Promise<DemuxResult> {
     hasAudio: false,
   };
 
-  // avcC/hvcC description — 없으면 Safari에서 디코드가 실패한다
+  // avcC/hvcC description — 없으면 Safari에서 디코드가 실패한다.
+  // avc3/hev1(인밴드 파라미터셋)은 description 없이도 되는 브라우저가 있어 시도는 하되,
+  // avc1/hvc1인데 추출이 실패하면 명확히 거절한다.
   const description = extractVideoDescription(mp4, videoTrack.id);
+  const codecLower = videoTrack.codec.toLowerCase();
+  if (!description && (codecLower.startsWith('avc1') || codecLower.startsWith('hvc1'))) {
+    throw new UnsupportedSourceError('영상의 코덱 설정 정보(avcC/hvcC)를 읽지 못했습니다. 파일이 손상되었거나 비표준 형식입니다.');
+  }
   const videoConfig: VideoDecoderConfig = {
     codec: videoTrack.codec,
     codedWidth: codedW,
@@ -154,7 +161,7 @@ function rejectUnsupported(mp4: MP4File, track: MP4MediaTrack): void {
   const w = track.video?.width ?? track.track_width;
   const h = track.video?.height ?? track.track_height;
   if (Math.max(w, h) > MAX_LONG_SIDE) {
-    throw new UnsupportedSourceError('4K를 초과하는 영상은 지원하지 않습니다 (긴 변 2160px 이하).');
+    throw new UnsupportedSourceError('4K를 초과하는 영상은 지원하지 않습니다 (긴 변 4096px 이하).');
   }
 
   // 10-bit 감지: avcC 프로파일 / hvcC bitDepth

@@ -53,7 +53,20 @@ export function decodeStream(
     signal.addEventListener('abort', onAbort, { once: true });
 
     const run = async (): Promise<void> => {
-      decoder.configure(config);
+      // 사전 지원 검사: Safari는 미지원 설정에서 무정보 TypeError를 던진다 — 먼저 걸러 명확히 알린다
+      const support = await VideoDecoder.isConfigSupported(config).catch(() => null);
+      if (!support?.supported) {
+        const isHevc = config.codec.toLowerCase().startsWith('hvc') || config.codec.toLowerCase().startsWith('hev');
+        throw new Error(
+          `이 브라우저에서 디코드할 수 없는 형식입니다 (${config.codec}).` +
+            (isHevc ? ' H.265(HEVC) 영상은 브라우저·기기에 따라 지원되지 않을 수 있습니다.' : ''),
+        );
+      }
+      try {
+        decoder.configure(config);
+      } catch (e) {
+        throw new Error(`디코더 설정 실패 (${config.codec}): ${e instanceof Error ? e.message : e}`);
+      }
       for (const chunk of chunks) {
         if (failed || signal.aborted) return;
         // 백프레셔: 큐가 쌓이면 대기. 없으면 1080p 장시간 영상에서 탭이 죽는다.

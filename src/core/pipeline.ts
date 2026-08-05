@@ -59,6 +59,8 @@ export async function analyze(
     displayWidth: meta.width,
     displayHeight: meta.height,
     rotation: meta.rotation,
+  }).catch((e) => {
+    throw new Error(`얼굴 검출기 초기화 실패: ${e instanceof Error ? e.message : e}`);
   });
 
   const perFrame: { t: number; detections: Detection[] }[] = [];
@@ -119,16 +121,25 @@ export async function render(
   progress({ phase: 'demux', done: 1, total: 1, etaMs: 0 });
 
   const fps = meta.frameCount / Math.max(0.001, meta.durationUs / 1e6);
+
+  // 2160 초과 소스(4K)는 1080p(긴 변 1920)로 다운스케일해 내보낸다.
+  // 박스는 정규화 좌표라 해상도 변경에 영향받지 않는다.
+  const outScale = Math.max(meta.width, meta.height) > 2160 ? 1920 / Math.max(meta.width, meta.height) : 1;
+  const even = (v: number): number => Math.max(2, Math.round(v * outScale)) & ~1;
+  const outW = even(meta.width);
+  const outH = even(meta.height);
+  const renderMeta = { ...meta, width: outW, height: outH };
+
   const encoder = await createEncoder({
-    width: meta.width,
-    height: meta.height,
+    width: outW,
+    height: outH,
     fps,
-    bitrate: defaultBitrate(meta.width, meta.height, fps, file.size, meta.durationUs),
+    bitrate: defaultBitrate(outW, outH, fps, outScale === 1 ? file.size : 0, meta.durationUs),
     audio,
   });
 
   // 렌더 캔버스 (표시 방향, 회전 baked)
-  const canvas = new OffscreenCanvas(meta.width, meta.height);
+  const canvas = new OffscreenCanvas(outW, outH);
   const ctx = canvas.getContext('2d')!;
 
   const enabledTracks = project.tracks.filter((t) => t.enabled);
@@ -145,13 +156,13 @@ export async function render(
         try {
           if (signal.aborted) return;
           const t = frame.timestamp;
-          drawFrameOriented(ctx, frame, meta.rotation, meta.width, meta.height);
+          drawFrameOriented(ctx, frame, meta.rotation, outW, outH);
           const boxes = [];
           for (const track of enabledTracks) {
             const box = sampleTrackAt(track, t);
             if (box) boxes.push({ box, style: styleOf(track) });
           }
-          if (boxes.length > 0) redactFrame(ctx, null, boxes, meta);
+          if (boxes.length > 0) redactFrame(ctx, null, boxes, renderMeta);
           const out = new VideoFrame(canvas, { timestamp: t, duration: frame.duration ?? undefined });
           try {
             await encoder.encodeFrame(out);
