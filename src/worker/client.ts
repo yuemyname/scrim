@@ -1,7 +1,7 @@
 /**
  * 메인 스레드에서 파이프라인 워커를 Promise API로 감싼다.
  */
-import type { FrameIndex, Progress, Project } from '../types';
+import type { Box, FrameIndex, Progress, Project, TrackSample } from '../types';
 import type { WorkerRequest, WorkerResponse } from './protocol';
 
 export class PipelineClient {
@@ -39,6 +39,10 @@ export class PipelineClient {
       case 'rendered':
         this.pending.delete(msg.jobId);
         job.resolve(msg.blob);
+        break;
+      case 'tracked':
+        this.pending.delete(msg.jobId);
+        job.resolve(msg.samples);
         break;
       case 'cancelled': {
         this.pending.delete(msg.jobId);
@@ -93,6 +97,21 @@ export class PipelineClient {
     return new Promise((resolve, reject) => {
       this.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject, onProgress });
       this.send({ type: 'render', jobId, file, project, maxLongSide });
+    });
+  }
+
+  trackRegion(
+    file: File,
+    startUs: number,
+    endUs: number,
+    initBox: Box,
+    minConfidence: number,
+    onProgress?: (p: Progress) => void,
+  ): Promise<TrackSample[]> {
+    const jobId = ++this.jobSeq;
+    return new Promise((resolve, reject) => {
+      this.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject, onProgress });
+      this.send({ type: 'trackRegion', jobId, file, startUs, endUs, initBox, minConfidence });
     });
   }
 

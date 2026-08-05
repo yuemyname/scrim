@@ -122,6 +122,80 @@ export async function createYunetDetector(opts: DetectorOptions): Promise<Detect
   };
 }
 
+/**
+ * 임의 캔버스 영역에 대한 검출기 (수동 박스 추적용).
+ * 잘라낸 영역을 640 입력에 레터박스로 넣어 검출한다 — 작은 얼굴도
+ * 크게 확대되어 들어가므로 전체 프레임에서 놓친 얼굴을 잡을 수 있다.
+ */
+export interface RegionDetector {
+  /** src의 (0,0,dw,dh) 영역을 검출. 반환 박스는 dw/dh 기준 정규화 */
+  detect(src: OffscreenCanvas, dw: number, dh: number): Promise<Detection[]>;
+  close(): void;
+}
+
+export async function createYunetRegionDetector(minConfidence: number): Promise<RegionDetector> {
+  ort.env.wasm.wasmPaths = ORT_WASM_ROOT;
+  ort.env.wasm.numThreads = 1;
+  const session = await ort.InferenceSession.create(YUNET_MODEL_URL, { executionProviders: ['wasm'] });
+  const inputName = session.inputNames[0];
+  if (!inputName) throw new Error('YuNet: 입력 텐서를 찾을 수 없습니다');
+
+  const inW = 640;
+  const inH = 640;
+  const canvas = new OffscreenCanvas(inW, inH);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  const input = new Float32Array(3 * inW * inH);
+  const threshold = Math.min(0.95, minConfidence + 0.2);
+
+  return {
+    async detect(src: OffscreenCanvas, dw: number, dh: number): Promise<Detection[]> {
+      const scale = Math.min(inW / dw, inH / dh);
+      const ddw = Math.max(2, Math.round(dw * scale));
+      const ddh = Math.max(2, Math.round(dh * scale));
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, inW, inH);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(src, 0, 0, dw, dh, 0, 0, ddw, ddh);
+
+      const rgba = ctx.getImageData(0, 0, inW, inH).data;
+      const plane = inW * inH;
+      for (let i = 0; i < plane; i++) {
+        input[i] = rgba[i * 4 + 2] ?? 0;
+        input[plane + i] = rgba[i * 4 + 1] ?? 0;
+        input[2 * plane + i] = rgba[i * 4] ?? 0;
+      }
+      const tensor = new ort.Tensor('float32', input, [1, 3, inH, inW]);
+      const outputs = await session.run({ [inputName]: tensor });
+
+      const detections: Detection[] = [];
+      for (const s of STRIDES) {
+        const cls = pick(outputs, 'cls', s);
+        const obj = pick(outputs, 'obj', s);
+        const bbox = pick(outputs, 'bbox', s);
+        if (!cls || !obj || !bbox) continue;
+        const cols = inW / s;
+        for (let idx = 0; idx < cls.length; idx++) {
+          const score = Math.sqrt(clamp01(cls[idx] ?? 0) * clamp01(obj[idx] ?? 0));
+          if (score < threshold) continue;
+          const row = Math.floor(idx / cols);
+          const col = idx % cols;
+          const cx = (col + (bbox[idx * 4] ?? 0)) * s;
+          const cy = (row + (bbox[idx * 4 + 1] ?? 0)) * s;
+          const bw = Math.exp(bbox[idx * 4 + 2] ?? 0) * s;
+          const bh = Math.exp(bbox[idx * 4 + 3] ?? 0) * s;
+          const box = { x: (cx - bw / 2) / ddw, y: (cy - bh / 2) / ddh, w: bw / ddw, h: bh / ddh };
+          if (box.w <= 0 || box.h <= 0 || box.x > 1 || box.y > 1) continue;
+          detections.push({ box, score });
+        }
+      }
+      return nms(detections, 0.45);
+    },
+    close(): void {
+      void session.release();
+    },
+  };
+}
+
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }

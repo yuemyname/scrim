@@ -83,6 +83,26 @@ const M = {
     en: 'Draw a new box even over existing covers (B)',
   },
   addBoxHint: { ko: '화면에서 드래그해 새 박스를 그리세요', en: 'Drag on the frame to draw a new box' },
+  trackFace: { ko: '얼굴 추적', en: 'Track face' },
+  trackFaceTip: {
+    ko: '선택한 수동 박스의 대상을 구간 동안 자동으로 따라갑니다',
+    en: 'Automatically follow the selected manual box across its range',
+  },
+  tracking: { ko: '추적 중', en: 'Tracking' },
+  trackNeedManual: {
+    ko: '먼저 수동으로 그린 박스를 선택하세요',
+    en: 'Select a manually drawn box first',
+  },
+  trackDone: {
+    ko: '추적 완료 — {n}개 프레임에서 얼굴을 찾았습니다',
+    en: 'Tracking done — face found on {n} frames',
+  },
+  trackFail: { ko: '추적에 실패했습니다: {msg}', en: 'Tracking failed: {msg}' },
+  trackNoFrames: {
+    ko: '구간에서 프레임을 읽지 못해 추적 결과가 없습니다',
+    en: 'No frames could be read in this range — nothing tracked',
+  },
+  trackCancelled: { ko: '추적을 취소했습니다', en: 'Tracking cancelled' },
   cutMark: { ko: '컷 표시', en: 'Mark cut' },
   cutTip: {
     ko: '현재 위치에 장면 경계 마커 추가/삭제 (C)',

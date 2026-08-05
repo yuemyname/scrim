@@ -45,6 +45,16 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         signal,
       );
       post({ type: 'rendered', jobId, blob });
+    } else if (msg.type === 'trackRegion') {
+      // 추적은 드물게 쓰인다 — 동적 import로 분석/렌더 경로 번들에서 분리
+      const { trackRegion } = await import('../core/regiontrack');
+      const samples = await trackRegion(
+        msg.file,
+        { startUs: msg.startUs, endUs: msg.endUs, initBox: msg.initBox, minConfidence: msg.minConfidence },
+        (p) => post({ type: 'progress', jobId, progress: p }),
+        signal,
+      );
+      post({ type: 'tracked', jobId, samples });
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {

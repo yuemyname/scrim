@@ -389,6 +389,11 @@ class App {
     cutBtn.title = t('cutTip');
     cutBtn.addEventListener('click', () => this.toggleCut());
 
+    const trackBtn = document.createElement('button');
+    trackBtn.textContent = t('trackFace');
+    trackBtn.title = t('trackFaceTip');
+    trackBtn.addEventListener('click', () => void this.trackSelected());
+
     const spacer = document.createElement('span');
     spacer.className = 'spacer';
 
@@ -411,7 +416,7 @@ class App {
     if (state.isImage) {
       transport.append(undoBtn, redoBtn, addBoxBtn, spacer);
     } else {
-      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, cutBtn, spacer);
+      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, trackBtn, cutBtn, spacer);
     }
 
     const timeline = new Timeline(state);
@@ -514,6 +519,60 @@ class App {
       toast(t('cutAdded'));
     }
     state.emit('project');
+  }
+
+  private trackingBusy = false;
+
+  /** 선택한 수동 박스의 구간을 워커에서 추적해 샘플로 치환한다 */
+  private async trackSelected(): Promise<void> {
+    const state = this.state;
+    const project = state.project;
+    const file = state.file;
+    if (!project || !file || state.isImage || this.rendering || this.trackingBusy) return;
+
+    const sel = state.selectedTrack();
+    if (!sel || sel.origin !== 'manual') {
+      toast(t('trackNeedManual'));
+      return;
+    }
+    const first = sel.samples[0];
+    const last = sel.samples[sel.samples.length - 1];
+    if (!first || !last || last.t <= first.t) {
+      toast(t('trackNeedManual'));
+      return;
+    }
+    const initBox = sampleTrackAt(sel, first.t) ?? first.box;
+
+    this.trackingBusy = true;
+    const progress = openProgressModal(t('tracking'), () => this.client.cancel());
+    try {
+      const samples = await this.client.trackRegion(
+        file,
+        first.t,
+        last.t,
+        initBox,
+        this.minConfidence,
+        (p) => progress.update(p),
+      );
+      if (samples.length < 2) {
+        toast(t('trackNoFrames'));
+        return;
+      }
+      state.pushUndo();
+      sel.samples = samples;
+      state.emit('project');
+      const found = samples.filter((s) => s.source === 'detected').length;
+      toast(t('trackDone', { n: found }));
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        toast(t('trackCancelled'));
+      } else {
+        toast(t('trackFail', { msg: e instanceof Error ? e.message : String(e) }));
+      }
+    } finally {
+      this.trackingBusy = false;
+      progress.close();
+    }
   }
 
   private exportChoice: number | null | 'unset' = 'unset';
