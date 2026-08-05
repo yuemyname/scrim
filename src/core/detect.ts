@@ -5,8 +5,8 @@
  * 거짓 양성(안 가려도 될 걸 가림)은 비용이 낮고, 거짓 음성(놓침)은 치명적이다.
  * 이 비대칭 때문에 검출은 관대하게, 노이즈 제거는 트래커(minTrackFrames)에서 한다.
  */
-import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
-import { FACE_MODEL_PATH, WASM_ROOT } from './assets';
+import { FaceDetector } from '@mediapipe/tasks-vision';
+import { FACE_MODEL_URL, WASM_BINARY_URL, WASM_LOADER_URL } from './assets';
 import type { Box, Detection } from '../types';
 import { drawVideoFrame } from './orient';
 
@@ -27,10 +27,12 @@ export interface DetectorOptions {
 }
 
 export async function createDetector(opts: DetectorOptions): Promise<Detector> {
-  const fileset = await FilesetResolver.forVisionTasks(WASM_ROOT);
+  // FilesetResolver 대신 수동 fileset: 캐시 무효화 버전 쿼리를 경로에 붙이기 위함.
+  // SIMD 변형만 쓴다 — 요구 브라우저(Safari 16.4+/Chrome 94+/Firefox 130+)는 전부 wasm SIMD 지원.
+  const fileset = { wasmLoaderPath: WASM_LOADER_URL, wasmBinaryPath: WASM_BINARY_URL };
   const makeDetector = (delegate: 'GPU' | 'CPU'): Promise<FaceDetector> =>
     FaceDetector.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: FACE_MODEL_PATH, delegate },
+      baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
       runningMode: 'VIDEO',
       minDetectionConfidence: opts.minConfidence,
     });
