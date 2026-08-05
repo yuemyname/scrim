@@ -21,6 +21,11 @@ export interface AnalyzeOptions {
   longSide: number;
 }
 
+export interface RenderOptions {
+  /** 출력 긴 변 상한. null이면 원본 해상도 유지 */
+  maxLongSide: number | null;
+}
+
 export function makeProgressThrottle(onProgress: (p: Progress) => void): (p: Progress) => void {
   // postMessage를 프레임마다 보내면 그것만으로 20% 느려진다 — 80ms로 throttle
   let last = 0;
@@ -126,6 +131,7 @@ export async function analyze(
 export async function render(
   file: File,
   project: Project,
+  opts: RenderOptions,
   onProgress: (p: Progress) => void,
   signal: AbortSignal,
 ): Promise<Blob> {
@@ -136,9 +142,10 @@ export async function render(
 
   const fps = meta.frameCount / Math.max(0.001, meta.durationUs / 1e6);
 
-  // 2160 초과 소스(4K)는 1080p(긴 변 1920)로 다운스케일해 내보낸다.
+  // 출력 해상도는 사용자가 선택한다 (null = 원본 유지).
   // 박스는 정규화 좌표라 해상도 변경에 영향받지 않는다.
-  const outScale = Math.max(meta.width, meta.height) > 2160 ? 1920 / Math.max(meta.width, meta.height) : 1;
+  const maxSide = Math.max(meta.width, meta.height);
+  const outScale = opts.maxLongSide ? Math.min(1, opts.maxLongSide / maxSide) : 1;
   const even = (v: number): number => Math.max(2, Math.round(v * outScale)) & ~1;
   const outW = even(meta.width);
   const outH = even(meta.height);

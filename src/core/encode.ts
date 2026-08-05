@@ -9,6 +9,8 @@ import { waitDequeue } from './queue';
 const MAX_ENCODE_QUEUE = 8;
 const KEYFRAME_INTERVAL_US = 2_000_000; // 2초
 const CODEC_FALLBACKS = ['avc1.42E01F', 'avc1.4D401F', 'avc1.640028'];
+/** 긴 변 1920 초과(1440p·4K)는 Level 5.1+ 필요 — 상위 레벨을 먼저 시도 */
+const CODEC_HIGH_RES = ['avc1.640033', 'avc1.640034'];
 
 export interface EncoderOptions {
   width: number;
@@ -29,8 +31,9 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
   const width = opts.width - (opts.width % 2);
   const height = opts.height - (opts.height % 2);
 
+  const candidates = Math.max(width, height) > 1920 ? [...CODEC_HIGH_RES, ...CODEC_FALLBACKS] : CODEC_FALLBACKS;
   let codec: string | null = null;
-  for (const candidate of CODEC_FALLBACKS) {
+  for (const candidate of candidates) {
     const support = await VideoEncoder.isConfigSupported({
       codec: candidate,
       width,

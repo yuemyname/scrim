@@ -37,6 +37,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       const blob = await render(
         msg.file,
         msg.project,
+        { maxLongSide: msg.maxLongSide },
         (p) => post({ type: 'progress', jobId, progress: p }),
         signal,
       );

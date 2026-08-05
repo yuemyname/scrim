@@ -174,8 +174,6 @@ class App {
 
       if (project.source.durationUs > LONG_VIDEO_WARN_US) {
         toast('5분이 넘는 영상입니다. 처리 시간이 길어질 수 있으니 구간을 나눠 작업하는 것을 권합니다.');
-      } else if (Math.max(project.source.width, project.source.height) > 2160) {
-        toast('4K 영상입니다. 내보낼 때 1080p로 다운스케일됩니다.');
       }
       this.renderReview();
     } catch (e) {
@@ -381,7 +379,75 @@ class App {
     });
   }
 
-  private async exportVideo(): Promise<void> {
+  private exportChoice: number | null | 'unset' = 'unset';
+
+  /** 내보내기 해상도 선택 모달 → 선택 시 렌더 시작 */
+  private exportVideo(): void {
+    const project = this.state.project;
+    if (!project || this.rendering) return;
+    const { width, height } = project.source;
+    const maxSide = Math.max(width, height);
+
+    const dims = (cap: number | null): string => {
+      const s = cap ? Math.min(1, cap / maxSide) : 1;
+      const even = (v: number): number => Math.max(2, Math.round(v * s)) & ~1;
+      return `${even(width)}×${even(height)}`;
+    };
+
+    const options: { label: string; value: number | null }[] = [];
+    options.push({ label: `원본 — ${dims(null)}`, value: null });
+    if (maxSide > 1920) options.push({ label: `1080p — ${dims(1920)}`, value: 1920 });
+    if (maxSide > 1280) options.push({ label: `720p — ${dims(1280)}`, value: 1280 });
+
+    // 기본값: 4K 초과 소스는 1080p (완주 안정성), 그 외 원본
+    const defaultValue = this.exportChoice !== 'unset' ? this.exportChoice : maxSide > 2160 ? 1920 : null;
+
+    openModal((modal, close) => {
+      const h = document.createElement('h3');
+      h.textContent = '내보내기';
+      const p = document.createElement('p');
+      p.textContent = '해상도';
+      const select = document.createElement('select');
+      select.style.width = '100%';
+      for (const opt of options) {
+        const o = document.createElement('option');
+        o.value = opt.value === null ? 'original' : String(opt.value);
+        o.textContent = opt.label;
+        select.appendChild(o);
+      }
+      select.value = defaultValue === null ? 'original' : String(defaultValue);
+
+      const warn = document.createElement('p');
+      const updateWarn = (): void => {
+        const original = select.value === 'original';
+        warn.textContent =
+          original && maxSide > 2160
+            ? '원본(4K) 그대로 내보내면 기기에 따라 시간이 오래 걸리거나 메모리 부족으로 실패할 수 있습니다.'
+            : '';
+      };
+      select.addEventListener('change', updateWarn);
+      updateWarn();
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const cancel = document.createElement('button');
+      cancel.textContent = '취소';
+      cancel.addEventListener('click', close);
+      const go = document.createElement('button');
+      go.className = 'primary';
+      go.textContent = '내보내기';
+      go.addEventListener('click', () => {
+        const value = select.value === 'original' ? null : Number(select.value);
+        this.exportChoice = value;
+        close();
+        void this.runRender(value);
+      });
+      actions.append(cancel, go);
+      modal.append(h, p, select, warn, actions);
+    });
+  }
+
+  private async runRender(maxLongSide: number | null): Promise<void> {
     const state = this.state;
     const project = state.project;
     const file = state.file;
@@ -391,7 +457,7 @@ class App {
     state.phase = 'rendering';
     const progress = openProgressModal('내보내는 중', () => this.client.cancel());
     try {
-      const blob = await this.client.render(file, project, (p) => progress.update(p));
+      const blob = await this.client.render(file, project, maxLongSide, (p) => progress.update(p));
       progress.close();
       const outName = `${file.name.replace(/\.[^.]+$/, '')}_scrim.mp4`;
       const saved = await saveBlob(blob, outName, 'video/mp4', '.mp4');

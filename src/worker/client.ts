@@ -71,11 +71,16 @@ export class PipelineClient {
     });
   }
 
-  render(file: File, project: Project, onProgress?: (p: Progress) => void): Promise<Blob> {
+  render(
+    file: File,
+    project: Project,
+    maxLongSide: number | null,
+    onProgress?: (p: Progress) => void,
+  ): Promise<Blob> {
     const jobId = ++this.jobSeq;
     return new Promise((resolve, reject) => {
       this.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject, onProgress });
-      this.send({ type: 'render', jobId, file, project });
+      this.send({ type: 'render', jobId, file, project, maxLongSide });
     });
   }
 
