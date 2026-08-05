@@ -28,7 +28,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     if (msg.type === 'analyze') {
       const result = await analyze(
         msg.file,
-        { longSide: msg.longSide, minConfidence: msg.minConfidence, tiled: msg.tiled },
+        { longSide: msg.longSide, minConfidence: msg.minConfidence, tiled: msg.tiled, engine: msg.engine },
         (p) => post({ type: 'progress', jobId, progress: p }),
         signal,
       );

@@ -237,6 +237,16 @@ function lowerBound(arr: number[], v: number): number {
   return lo;
 }
 
+/** 중복 검출 제거 (greedy NMS) — 타일 병합·YuNet 후처리 공용 */
+export function nms<T extends { box: Box; score: number }>(dets: T[], iouThreshold: number): T[] {
+  const sorted = [...dets].sort((a, b) => b.score - a.score);
+  const kept: T[] = [];
+  for (const d of sorted) {
+    if (kept.every((k) => iou(k.box, d.box) < iouThreshold)) kept.push(d);
+  }
+  return kept;
+}
+
 export function iou(a: Box, b: Box): number {
   const x1 = Math.max(a.x, b.x);
   const y1 = Math.max(a.y, b.y);

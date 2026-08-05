@@ -23,6 +23,8 @@ export interface AnalyzeOptions {
   minConfidence?: number;
   /** 타일 스캔 모드 — 작은 얼굴 검출률 상승, 속도 ~5배 하락 */
   tiled?: boolean;
+  /** 검출 엔진: yunet(기본, 군중·원거리 강화) / blaze(MediaPipe) */
+  engine?: 'yunet' | 'blaze';
 }
 
 export interface RenderOptions {
@@ -80,6 +82,7 @@ export async function analyze(
     minConfidence: opts.minConfidence ?? 0.35,
     longSide: opts.longSide,
     tiled: opts.tiled ?? false,
+    engine: opts.engine ?? 'yunet',
     displayWidth: meta.width,
     displayHeight: meta.height,
     rotation: meta.rotation,

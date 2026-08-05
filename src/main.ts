@@ -89,6 +89,7 @@ class App {
   private longSide = 512;
   private minConfidence = 0.35;
   private tiled = false;
+  private engine: 'yunet' | 'blaze' = 'yunet';
   private rendering = false;
   private player: Player | null = null;
 
@@ -175,7 +176,22 @@ class App {
     senseSelect.value = String(this.minConfidence);
     senseSelect.addEventListener('change', () => (this.minConfidence = Number(senseSelect.value)));
 
-    options.append(label, select, senseLabel, senseSelect);
+    const engineLabel = document.createElement('span');
+    engineLabel.textContent = '검출 엔진';
+    const engineSelect = document.createElement('select');
+    for (const [v, text] of [
+      ['yunet', '강화 — 군중·원거리 (기본)'],
+      ['blaze', '기존 — MediaPipe'],
+    ] as const) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = text;
+      engineSelect.appendChild(opt);
+    }
+    engineSelect.value = this.engine;
+    engineSelect.addEventListener('change', () => (this.engine = engineSelect.value as 'yunet' | 'blaze'));
+
+    options.append(engineLabel, engineSelect, label, select, senseLabel, senseSelect);
 
     const resumeBtn = document.createElement('button');
     resumeBtn.textContent = '저장한 프로젝트 이어서 작업';
@@ -333,7 +349,7 @@ class App {
     document.addEventListener('visibilitychange', visHandler);
 
     try {
-      const { project, frames } = await this.client.analyze(file, this.longSide, this.minConfidence, this.tiled, (p) => {
+      const { project, frames } = await this.client.analyze(file, this.longSide, this.minConfidence, this.tiled, this.engine, (p) => {
         lastProgressAt = performance.now();
         progress.update(p);
       });

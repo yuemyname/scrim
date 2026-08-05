@@ -13,7 +13,8 @@
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.14",
     "mp4-muxer": "^5.1.5",
-    "mp4box": "^0.5.2"
+    "mp4box": "^0.5.2",
+    "onnxruntime-web": "^1.27.0"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",

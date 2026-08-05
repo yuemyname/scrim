@@ -57,3 +57,24 @@ try {
   await pipeline(Readable.fromWeb(res.body), createWriteStream(modelOut));
   console.log('downloaded blaze_face_short_range.tflite');
 }
+
+// YuNet 얼굴 검출 모델 (OpenCV Zoo, MIT) + onnxruntime-web wasm 런타임
+const yunetUrl =
+  'https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx';
+const yunetOut = path.join(outDir, 'yunet.onnx');
+try {
+  await access(yunetOut);
+  console.log('yunet model already present, skipping download');
+} catch {
+  const res = await fetch(yunetUrl);
+  if (!res.ok || !res.body) throw new Error(`yunet download failed: ${res.status}`);
+  await pipeline(Readable.fromWeb(res.body), createWriteStream(yunetOut));
+  console.log('downloaded yunet.onnx');
+}
+
+await mkdir(path.join(outDir, 'ort'), { recursive: true });
+const ortDist = path.join(projectRoot, 'node_modules/onnxruntime-web/dist');
+for (const f of ['ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']) {
+  await cp(path.join(ortDist, f), path.join(outDir, 'ort', f));
+}
+console.log('copied onnxruntime-web wasm runtime');

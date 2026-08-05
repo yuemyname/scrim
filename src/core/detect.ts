@@ -9,7 +9,7 @@ import { FaceDetector } from '@mediapipe/tasks-vision';
 import { FACE_MODEL_URL, WASM_BINARY_URL, WASM_LOADER_URL } from './assets';
 import type { Box, Detection } from '../types';
 import { drawVideoFrame } from './orient';
-import { iou } from './track';
+import { nms } from './track';
 
 export interface DetectResult {
   detections: Detection[];
@@ -35,6 +35,8 @@ export interface DetectorOptions {
   displayWidth: number;
   displayHeight: number;
   rotation: number;
+  /** 검출 엔진. yunet(기본): 군중·원거리 강화 / blaze: MediaPipe */
+  engine?: 'yunet' | 'blaze';
 }
 
 /** 타일 레이아웃: 60% 크기 타일 4개, 20% 겹침 — 경계에 걸친 얼굴 누락 방지 */
@@ -46,17 +48,22 @@ const TILE_OFFSETS: [number, number][] = [
   [0.4, 0.4],
 ];
 
-/** 타일 간 중복 검출 제거 (greedy NMS) */
-function nms(dets: Detection[], iouThreshold: number): Detection[] {
-  const sorted = [...dets].sort((a, b) => b.score - a.score);
-  const kept: Detection[] = [];
-  for (const d of sorted) {
-    if (kept.every((k) => iou(k.box, d.box) < iouThreshold)) kept.push(d);
-  }
-  return kept;
-}
+
 
 export async function createDetector(opts: DetectorOptions): Promise<Detector> {
+  if ((opts.engine ?? 'yunet') === 'yunet') {
+    try {
+      const { createYunetDetector } = await import('./yunet');
+      // 타일 옵션은 blaze 전용 — yunet에서는 입력 해상도 상향으로 대체
+      return await createYunetDetector({ ...opts, longSide: opts.tiled ? Math.max(opts.longSide, 1024) : opts.longSide });
+    } catch (e) {
+      console.warn('[scrim] YuNet 초기화 실패 — MediaPipe로 폴백:', e);
+    }
+  }
+  return createBlazeDetector(opts);
+}
+
+async function createBlazeDetector(opts: DetectorOptions): Promise<Detector> {
   // WebKit(iPad Safari/Chrome)의 모듈 워커에는 importScripts가 아예 없다.
   // tasks-vision 로더는 typeof importScripts로 워커 여부를 판단하므로, 없으면
   // document.createElement 경로로 빠져 "Can't find variable: document"로 죽는다.

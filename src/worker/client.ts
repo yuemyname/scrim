@@ -64,12 +64,13 @@ export class PipelineClient {
     longSide: number,
     minConfidence: number,
     tiled: boolean,
+    engine: 'yunet' | 'blaze',
     onProgress?: (p: Progress) => void,
   ): Promise<{ project: Project; frames: FrameIndex }> {
     const jobId = ++this.jobSeq;
     return new Promise((resolve, reject) => {
       this.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject, onProgress });
-      this.send({ type: 'analyze', jobId, file, longSide, minConfidence, tiled });
+      this.send({ type: 'analyze', jobId, file, longSide, minConfidence, tiled, engine });
     });
   }
 
