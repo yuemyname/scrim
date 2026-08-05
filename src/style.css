@@ -156,6 +156,14 @@ select {
   cursor: crosshair;
   touch-action: none;
 }
+.player-wrap .box-delete {
+  position: absolute;
+  z-index: 5;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(22, 22, 26, 0.9);
+  border-color: var(--ink-muted);
+}
 
 /* ── 사이드바 ─────────────────────────── */
 .sidebar {
@@ -211,6 +219,17 @@ select {
   margin-left: auto;
   color: var(--ink-muted);
   font-size: 11px;
+}
+.track-list li .track-delete {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  flex: none;
+}
+.track-list li .track-delete:hover {
+  color: var(--ink);
 }
 .empty-note {
   padding: 6px 14px;

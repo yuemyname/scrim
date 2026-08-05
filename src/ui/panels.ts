@@ -82,7 +82,20 @@ export class Sidebar {
       origin.className = 'origin-tag';
       origin.textContent = track.origin === 'manual' ? '수동' : '';
 
-      li.append(dot, tid, range, origin);
+      const del = document.createElement('button');
+      del.className = 'track-delete';
+      del.textContent = '✕';
+      del.title = '트랙 삭제';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.state.pushUndo();
+        project.tracks = project.tracks.filter((t) => t.id !== track.id);
+        if (this.state.selectedTrackId === track.id) this.state.selectedTrackId = null;
+        this.state.emit('selection');
+        this.state.emit('project');
+      });
+
+      li.append(dot, tid, range, origin, del);
       li.addEventListener('click', () => {
         this.state.selectedTrackId = track.id;
         // 항상 트랙의 실제 시작(양끝 연장분 제외한 첫 검출/수동 샘플)으로 이동

@@ -319,6 +319,14 @@ class App {
       playBtn.textContent = state.playing ? '일시정지' : '재생';
     });
 
+    const undoBtn = document.createElement('button');
+    undoBtn.textContent = '되돌리기';
+    undoBtn.title = 'Cmd/Ctrl+Z';
+    undoBtn.addEventListener('click', () => {
+      if (state.undo()) toast('되돌렸습니다');
+      else toast('되돌릴 작업이 없습니다');
+    });
+
     const spacer = document.createElement('span');
     spacer.className = 'spacer';
 
@@ -330,7 +338,7 @@ class App {
     exportBtn.textContent = '내보내기';
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
-    transport.append(stepBack, playBtn, stepFwd, time, spacer, hazardCount, exportBtn);
+    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, spacer, hazardCount, exportBtn);
 
     const timeline = new Timeline(state);
     timeline.onHazardCountChange = (count) => {
@@ -389,14 +397,11 @@ class App {
         if (sel && project) {
           e.preventDefault();
           this.state.pushUndo();
-          if (sel.origin === 'manual') {
-            project.tracks = project.tracks.filter((t) => t.id !== sel.id);
-          } else {
-            sel.enabled = false; // 자동 트랙은 삭제 대신 끈다 (되돌릴 수 있게)
-          }
+          project.tracks = project.tracks.filter((t) => t.id !== sel.id);
           this.state.selectedTrackId = null;
           this.state.emit('selection');
           this.state.emit('project');
+          toast(`${sel.id} 트랙을 삭제했습니다`);
         }
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();

@@ -8,7 +8,7 @@
  */
 import type { Box, RedactStyle, Track } from '../types';
 import { sampleTrackAt } from '../core/track';
-import { redactFrame } from '../core/redact';
+import { redactFrame, scaleBox } from '../core/redact';
 import type { AppState } from './state';
 
 const HANDLE_PX = 10;
@@ -23,6 +23,7 @@ export class Player {
   readonly root: HTMLElement;
   readonly video: HTMLVideoElement;
   private overlay: HTMLCanvasElement;
+  private deleteBtn: HTMLButtonElement;
   private ctx: CanvasRenderingContext2D;
   private state: AppState;
   private drag: DragMode | null = null;
@@ -39,7 +40,13 @@ export class Player {
     this.video.preload = 'auto';
     this.overlay = document.createElement('canvas');
     this.overlay.className = 'overlay';
-    this.root.append(this.video, this.overlay);
+    // 터치 환경용 삭제 버튼 — 선택된 트랙의 박스 옆에 표시
+    this.deleteBtn = document.createElement('button');
+    this.deleteBtn.className = 'box-delete';
+    this.deleteBtn.textContent = '✕ 삭제';
+    this.deleteBtn.style.display = 'none';
+    this.deleteBtn.addEventListener('click', () => this.deleteSelected());
+    this.root.append(this.video, this.overlay, this.deleteBtn);
     const ctx = this.overlay.getContext('2d');
     if (!ctx) throw new Error('overlay 2d context');
     this.ctx = ctx;
@@ -177,11 +184,13 @@ export class Player {
       metaLike,
     );
 
-    // 선택된 트랙 외곽선 + 핸들
+    // 선택된 트랙 외곽선 + 핸들 + 삭제 버튼
     const sel = this.state.selectedTrack();
+    this.deleteBtn.style.display = 'none';
     if (sel) {
       const box = sampleTrackAt(sel, this.state.currentUs);
       if (box) {
+        this.positionDeleteButton(box);
         const x = box.x * W;
         const y = box.y * H;
         const w = box.w * W;
@@ -213,7 +222,38 @@ export class Player {
     }
   }
 
+  /** 선택된 트랙 삭제 (터치 환경에서 Delete 키 대체) */
+  private deleteSelected(): void {
+    const sel = this.state.selectedTrack();
+    const project = this.state.project;
+    if (!sel || !project) return;
+    this.state.pushUndo();
+    project.tracks = project.tracks.filter((t) => t.id !== sel.id);
+    this.state.selectedTrackId = null;
+    this.state.emit('selection');
+    this.state.emit('project');
+  }
+
+  private positionDeleteButton(box: Box): void {
+    const rect = this.overlay.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const rightPx = Math.min(rect.width - 4, (box.x + box.w) * rect.width + 6);
+    const topPx = Math.max(4, box.y * rect.height - 30);
+    this.deleteBtn.style.display = 'block';
+    this.deleteBtn.style.left = `${Math.max(4, Math.min(rect.width - 70, rightPx))}px`;
+    this.deleteBtn.style.top = `${topPx}px`;
+  }
+
   // ── 포인터 인터랙션 ──────────────────────────────
+
+  private hitBox(track: Track, p: { x: number; y: number }, t: number): boolean {
+    // 눈에 보이는 가림 영역(스타일 확대 적용) 기준으로 판정한다
+    const base = sampleTrackAt(track, t);
+    if (!base) return false;
+    const style = track.style ?? this.state.project?.globalStyle;
+    const box = scaleBox(base, style?.scale ?? 1);
+    return p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h;
+  }
 
   private toNorm(e: PointerEvent): { x: number; y: number } {
     const rect = this.overlay.getBoundingClientRect();
@@ -255,12 +295,14 @@ export class Player {
         }
       }
 
-      // 2) 트랙 내부 → 선택 + move (수동 우선, 이어서 자동)
+      // 2) 트랙 내부 → 선택 + move (수동 우선, 이어서 자동).
+      //    판정은 눈에 보이는 가림 영역(확대 적용) 기준.
       const ordered = [...project.tracks].sort((a, b) => (a.origin === 'manual' ? -1 : 1) - (b.origin === 'manual' ? -1 : 1));
       for (const track of ordered) {
         if (!track.enabled) continue;
-        const box = sampleTrackAt(track, t);
-        if (box && p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h) {
+        if (this.hitBox(track, p, t)) {
+          const box = sampleTrackAt(track, t);
+          if (!box) continue;
           this.state.selectedTrackId = track.id;
           this.state.emit('selection');
           this.state.pushUndo();
