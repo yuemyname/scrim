@@ -83,8 +83,25 @@ export async function demux(file: File): Promise<DemuxResult> {
   });
 
   mp4.onSamples = (id, _user, samples) => {
-    if (videoTrack && id === videoTrack.id) videoSamples.push(...samples);
-    else if (audioTrack && id === audioTrack.id) audioSamples.push(...samples);
+    // 주의: releaseUsedSamples는 "같은 샘플 객체"의 data를 null로 만든다.
+    // 원본 객체를 보관하면 청크 생성 시점에 데이터가 사라져 있다 → 필드 스냅샷을 뜬다.
+    // data(Uint8Array) 참조는 우리가 쥐고 있으므로 버퍼는 살아남는다.
+    const target =
+      videoTrack && id === videoTrack.id ? videoSamples : audioTrack && id === audioTrack.id ? audioSamples : null;
+    if (target) {
+      for (const s of samples) {
+        target.push({
+          number: s.number,
+          track_id: s.track_id,
+          timescale: s.timescale,
+          dts: s.dts,
+          cts: s.cts,
+          duration: s.duration,
+          is_sync: s.is_sync,
+          data: s.data,
+        });
+      }
+    }
     mp4.releaseUsedSamples(id, samples[samples.length - 1]?.number ?? 0);
   };
 
@@ -170,15 +187,17 @@ export async function demux(file: File): Promise<DemuxResult> {
 
   let videoChunks: EncodedVideoChunk[];
   try {
-    videoChunks = videoSamples.map(
-      (s) =>
-        new EncodedVideoChunk({
-          type: s.is_sync ? 'key' : 'delta',
-          timestamp: toUs(s.cts, s.timescale),
-          duration: toUs(s.duration, s.timescale),
-          data: s.data,
-        }),
-    );
+    videoChunks = videoSamples.map((s) => {
+      if (!s.data || s.data.length === 0) {
+        throw new UnsupportedSourceError(`샘플 #${s.number}의 데이터가 비어 있습니다. 파일이 손상되었을 수 있습니다.`);
+      }
+      return new EncodedVideoChunk({
+        type: s.is_sync ? 'key' : 'delta',
+        timestamp: toUs(s.cts, s.timescale),
+        duration: toUs(s.duration, s.timescale),
+        data: s.data,
+      });
+    });
   } catch (e) {
     throw sub('비디오 청크 생성', e);
   }
