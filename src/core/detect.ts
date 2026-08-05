@@ -46,6 +46,10 @@ export async function createDetector(opts: DetectorOptions): Promise<Detector> {
       baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
       runningMode: 'VIDEO',
       minDetectionConfidence: opts.minConfidence,
+      // 캔버스를 명시하지 않으면 tasks-vision이 UA 문자열로 OffscreenCanvas 지원을
+      // 추정하는데, iPad Chrome(CriOS) UA에는 Version/ 토큰이 없어 미지원으로 오판하고
+      // document.createElement로 빠져 워커에서 죽는다. 명시하면 그 경로를 타지 않는다.
+      canvas: new OffscreenCanvas(1, 1),
     });
   // 일부 브라우저(특히 워커 내 WebGL 제약)에서 GPU 델리게이트가 실패한다 → CPU 폴백
   const detector = await makeDetector('GPU').catch(() => makeDetector('CPU'));
