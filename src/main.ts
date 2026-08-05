@@ -206,7 +206,10 @@ class App {
         const h = document.createElement('h3');
         h.textContent = '영상 파일 선택';
         const desc = document.createElement('p');
-        desc.textContent = `이 프로젝트는 '${saved.source.fileName}' 영상의 작업본입니다. 영상 파일은 프로젝트에 저장되지 않으므로 같은 파일을 다시 선택해 주세요.`;
+        desc.textContent =
+          `이 프로젝트는 '${saved.source.fileName}' 영상의 작업본입니다. ` +
+          '영상 파일은 프로젝트에 저장되지 않으므로 같은 영상을 다시 선택해 주세요. ' +
+          '(iOS에서는 선택할 때마다 파일 이름이 바뀔 수 있습니다 — 같은 영상이면 이름이 달라도 됩니다)';
         const actions = document.createElement('div');
         actions.className = 'actions';
         const cancel = document.createElement('button');
@@ -237,10 +240,12 @@ class App {
   }
 
   private async applySavedProject(saved: SavedProject, file: File): Promise<void> {
-    // 파일 매칭 검증: 크기가 저장돼 있으면 크기, 아니면 이름으로
-    const sizeMismatch = saved.fileSizeBytes !== undefined && saved.fileSizeBytes !== file.size;
+    // 파일 매칭 검증. iOS는 선택할 때마다 파일 이름을 바꾸는 경우가 많아
+    // 이름은 참고용일 뿐이다 — 크기가 정확히 일치하면 같은 영상으로 본다.
+    const sizeKnown = saved.fileSizeBytes !== undefined;
+    const sizeMismatch = sizeKnown && saved.fileSizeBytes !== file.size;
     const nameMismatch = saved.source.fileName !== file.name;
-    if (sizeMismatch || nameMismatch) {
+    if (sizeMismatch || (!sizeKnown && nameMismatch)) {
       const proceed = await new Promise<boolean>((resolve) => {
         openModal((modal, close) => {
           const h = document.createElement('h3');
@@ -282,6 +287,19 @@ class App {
       state.manualSeq = maxManualSeq(saved.tracks);
       this.renderReview();
       toast('프로젝트를 불러왔습니다');
+      // 최종 안전망: 실제 영상 길이가 프로젝트와 다르면 다른 영상이다
+      const video = this.player?.video;
+      if (video) {
+        video.addEventListener(
+          'loadedmetadata',
+          () => {
+            if (Number.isFinite(video.duration) && Math.abs(video.duration * 1e6 - saved.source.durationUs) > 100_000) {
+              toast('선택한 영상의 길이가 프로젝트와 다릅니다. 다른 영상이면 박스 위치가 어긋납니다.');
+            }
+          },
+          { once: true },
+        );
+      }
     } else {
       // 구버전 저장본: 분석 후 트랙만 덮어쓴다
       await this.openFile(file);
