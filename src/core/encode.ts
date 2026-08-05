@@ -18,6 +18,8 @@ export interface EncoderOptions {
   fps: number;
   bitrate: number;
   audio: AudioPassthrough | null;
+  /** true면 부가 옵션(latencyMode/hardwareAcceleration) 없이 최소 설정만 시도 */
+  conservative?: boolean;
 }
 
 export interface Encoder {
@@ -33,11 +35,9 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
 
   const candidates = Math.max(width, height) > 1920 ? [...CODEC_HIGH_RES, ...CODEC_FALLBACKS] : CODEC_FALLBACKS;
   // 일부 브라우저는 latencyMode/hardwareAcceleration 조합 자체를 거부한다 → 옵션을 줄여가며 시도
-  const extrasChain: Partial<VideoEncoderConfig>[] = [
-    { latencyMode: 'quality', hardwareAcceleration: 'prefer-hardware' },
-    { latencyMode: 'quality' },
-    {},
-  ];
+  const extrasChain: Partial<VideoEncoderConfig>[] = opts.conservative
+    ? [{}]
+    : [{ latencyMode: 'quality', hardwareAcceleration: 'prefer-hardware' }, { latencyMode: 'quality' }, {}];
   let config: VideoEncoderConfig | null = null;
   outer: for (const candidate of candidates) {
     for (const extras of extrasChain) {
@@ -46,7 +46,7 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
         width,
         height,
         bitrate: opts.bitrate,
-        framerate: opts.fps,
+        framerate: Math.max(1, Math.round(opts.fps)),
         ...extras,
       };
       const support = await VideoEncoder.isConfigSupported(attempt).catch(() => null);

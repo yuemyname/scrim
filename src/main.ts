@@ -76,6 +76,7 @@ class App {
   private root: HTMLElement;
   private fileInput: HTMLInputElement;
   private longSide = 512;
+  private minConfidence = 0.35;
   private rendering = false;
 
   constructor(root: HTMLElement) {
@@ -140,7 +141,24 @@ class App {
     }
     select.value = String(this.longSide);
     select.addEventListener('change', () => (this.longSide = Number(select.value)));
-    options.append(label, select);
+
+    const senseLabel = document.createElement('span');
+    senseLabel.textContent = '검출 민감도';
+    const senseSelect = document.createElement('select');
+    for (const [v, text] of [
+      ['0.35', '민감 — 놓침 최소 (기본)'],
+      ['0.5', '표준'],
+      ['0.65', '보수 — 잘못 가림 최소'],
+    ] as const) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = text;
+      senseSelect.appendChild(opt);
+    }
+    senseSelect.value = String(this.minConfidence);
+    senseSelect.addEventListener('change', () => (this.minConfidence = Number(senseSelect.value)));
+
+    options.append(label, select, senseLabel, senseSelect);
 
     landing.append(drop, options);
     this.root.append(buildTopbar(() => this.fileInput.click()), landing, buildPrivacyFooter());
@@ -162,7 +180,7 @@ class App {
     document.addEventListener('visibilitychange', visHandler);
 
     try {
-      const { project, frames } = await this.client.analyze(file, this.longSide, (p) => {
+      const { project, frames } = await this.client.analyze(file, this.longSide, this.minConfidence, (p) => {
         lastProgressAt = performance.now();
         progress.update(p);
       });

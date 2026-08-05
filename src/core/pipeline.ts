@@ -19,6 +19,8 @@ import { drawVideoFrame } from './orient';
 export interface AnalyzeOptions {
   /** 검출 입력 긴 변. 512 표준 / 768·1024 정밀 모드 */
   longSide: number;
+  /** 검출 임계값. 기본 0.35 (낮게 잡고 트래커에서 거른다). 오검출이 많으면 올린다 */
+  minConfidence?: number;
 }
 
 export interface RenderOptions {
@@ -73,7 +75,7 @@ export async function analyze(
   progress({ phase: 'demux', done: 1, total: 1, etaMs: 0 });
 
   const detector = await createDetector({
-    minConfidence: 0.35,
+    minConfidence: opts.minConfidence ?? 0.35,
     longSide: opts.longSide,
     displayWidth: meta.width,
     displayHeight: meta.height,
@@ -135,6 +137,33 @@ export async function render(
   onProgress: (p: Progress) => void,
   signal: AbortSignal,
 ): Promise<Blob> {
+  // 하드웨어 인코더는 isConfigSupported를 통과하고도 런타임에 실패할 수 있다
+  // (특히 Safari). 보수적 설정으로 단계적 재시도.
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await renderAttempt(file, project, opts, onProgress, signal, attempt);
+    } catch (e) {
+      lastError = e;
+      if (signal.aborted) throw e;
+      if (attempt < 2 && String(e).includes('EncodingError')) {
+        console.warn(`[scrim] 인코딩 실패 — 보수적 설정으로 재시도 (${attempt + 2}/3)`, e);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastError;
+}
+
+async function renderAttempt(
+  file: File,
+  project: Project,
+  opts: RenderOptions,
+  onProgress: (p: Progress) => void,
+  signal: AbortSignal,
+  attempt: number,
+): Promise<Blob> {
   const progress = makeProgressThrottle(onProgress);
   progress({ phase: 'demux', done: 0, total: 1, etaMs: 0 });
   const { meta, videoConfig, videoChunks, audio } = await demux(file).catch(rethrowWithStage('영상 읽기'));
@@ -151,12 +180,14 @@ export async function render(
   const outH = even(meta.height);
   const renderMeta = { ...meta, width: outW, height: outH };
 
+  const bitrateScale = attempt >= 2 ? 0.6 : 1;
   const encoder = await createEncoder({
     width: outW,
     height: outH,
     fps,
-    bitrate: defaultBitrate(outW, outH, fps, outScale === 1 ? file.size : 0, meta.durationUs),
+    bitrate: Math.round(defaultBitrate(outW, outH, fps, outScale === 1 ? file.size : 0, meta.durationUs) * bitrateScale),
     audio,
+    conservative: attempt > 0,
   }).catch(rethrowWithStage('인코더 초기화'));
 
   // 렌더 캔버스 (표시 방향, 회전 baked)
@@ -186,7 +217,8 @@ export async function render(
           if (boxes.length > 0) redactFrame(ctx, null, boxes, renderMeta);
           const out = ((): VideoFrame => {
             try {
-              return new VideoFrame(canvas, { timestamp: t, duration: frame.duration ?? undefined });
+              // alpha 채널은 인코더 실패 요인이 될 수 있다 — 항상 버린다
+              return new VideoFrame(canvas, { timestamp: t, duration: frame.duration ?? undefined, alpha: 'discard' });
             } catch (e) {
               throw stageError('캔버스→프레임 변환', e);
             }

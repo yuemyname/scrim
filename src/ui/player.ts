@@ -191,16 +191,15 @@ export class Player {
         this.ctx.setLineDash([6, 4]);
         this.ctx.strokeRect(x, y, w, h);
         this.ctx.setLineDash([]);
-        if (sel.origin === 'manual') {
-          this.ctx.fillStyle = '#E8E6E1';
-          for (const [cx, cy] of [
-            [x, y],
-            [x + w, y],
-            [x, y + h],
-            [x + w, y + h],
-          ] as const) {
-            this.ctx.fillRect(cx - 3, cy - 3, 6, 6);
-          }
+        // 자동/수동 구분 없이 선택된 트랙은 편집 가능 — 모서리 핸들 표시
+        this.ctx.fillStyle = '#E8E6E1';
+        for (const [cx, cy] of [
+          [x, y],
+          [x + w, y],
+          [x, y + h],
+          [x + w, y + h],
+        ] as const) {
+          this.ctx.fillRect(cx - 3, cy - 3, 6, 6);
         }
       }
     }
@@ -235,9 +234,9 @@ export class Player {
       const handleNX = HANDLE_PX / rect.width;
       const handleNY = HANDLE_PX / rect.height;
 
-      // 1) 선택된 수동 트랙의 모서리 → resize
+      // 1) 선택된 트랙의 모서리 → resize (자동 트랙도 편집 가능 — 'manual' 키프레임이 얹힌다)
       const sel = this.state.selectedTrack();
-      if (sel && sel.origin === 'manual') {
+      if (sel) {
         const box = sampleTrackAt(sel, t);
         if (box) {
           const corners = [
@@ -256,9 +255,10 @@ export class Player {
         }
       }
 
-      // 2) 수동 트랙 내부 → 선택 + move
-      for (const track of project.tracks) {
-        if (track.origin !== 'manual' || !track.enabled) continue;
+      // 2) 트랙 내부 → 선택 + move (수동 우선, 이어서 자동)
+      const ordered = [...project.tracks].sort((a, b) => (a.origin === 'manual' ? -1 : 1) - (b.origin === 'manual' ? -1 : 1));
+      for (const track of ordered) {
+        if (!track.enabled) continue;
         const box = sampleTrackAt(track, t);
         if (box && p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h) {
           this.state.selectedTrackId = track.id;
@@ -269,18 +269,7 @@ export class Player {
         }
       }
 
-      // 3) 자동 트랙 내부 → 선택만
-      for (const track of project.tracks) {
-        if (track.origin !== 'auto' || !track.enabled) continue;
-        const box = sampleTrackAt(track, t);
-        if (box && p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h) {
-          this.state.selectedTrackId = track.id;
-          this.state.emit('selection');
-          return;
-        }
-      }
-
-      // 4) 빈 곳 → 새 수동 박스 생성 시작
+      // 3) 빈 곳 → 새 수동 박스 생성 시작
       this.drag = { kind: 'create', startX: p.x, startY: p.y, box: { x: p.x, y: p.y, w: 0, h: 0 } };
     });
 
