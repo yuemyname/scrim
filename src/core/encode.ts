@@ -8,9 +8,24 @@ import { waitDequeue } from './queue';
 
 const MAX_ENCODE_QUEUE = 8;
 const KEYFRAME_INTERVAL_US = 2_000_000; // 2초
-const CODEC_FALLBACKS = ['avc1.42E01F', 'avc1.4D401F', 'avc1.640028'];
-/** 긴 변 1920 초과(1440p·4K)는 Level 5.1+ 필요 — 상위 레벨을 먼저 시도 */
-const CODEC_HIGH_RES = ['avc1.640033', 'avc1.640034'];
+/**
+ * 해상도에 맞는 H.264 레벨을 계산한다.
+ * WebKit은 isConfigSupported에서 레벨 초과를 걸러주지 않고 런타임에
+ * "Encoding task failed"로 죽는다 — 예: Level 3.1(최대 1280×720)로
+ * 세로 1080×1920을 인코딩 시도. 픽셀 수 기준으로 레벨을 고른다.
+ */
+function codecCandidates(width: number, height: number): string[] {
+  const px = width * height;
+  // 3.1: ≤921K(720p) / 4.0: ≤2.1M(1080p) / 5.1: ≤9.4M(4K) / 5.2
+  const level = px <= 921_600 ? '1F' : px <= 2_097_152 ? '28' : '33';
+  return [
+    `avc1.42E0${level}`, // Constrained Baseline
+    `avc1.4D40${level}`, // Main
+    `avc1.6400${level}`, // High
+    'avc1.640033',
+    'avc1.640034',
+  ];
+}
 
 export interface EncoderOptions {
   width: number;
@@ -33,7 +48,7 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
   const width = opts.width - (opts.width % 2);
   const height = opts.height - (opts.height % 2);
 
-  const candidates = Math.max(width, height) > 1920 ? [...CODEC_HIGH_RES, ...CODEC_FALLBACKS] : CODEC_FALLBACKS;
+  const candidates = codecCandidates(width, height);
   // 일부 브라우저는 latencyMode/hardwareAcceleration 조합 자체를 거부한다 → 옵션을 줄여가며 시도
   const extrasChain: Partial<VideoEncoderConfig>[] = opts.conservative
     ? [{}]

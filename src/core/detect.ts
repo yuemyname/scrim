@@ -10,8 +10,14 @@ import { FACE_MODEL_URL, WASM_BINARY_URL, WASM_LOADER_URL } from './assets';
 import type { Box, Detection } from '../types';
 import { drawVideoFrame } from './orient';
 
+export interface DetectResult {
+  detections: Detection[];
+  /** 직전 프레임 대비 화면 변화량 (0..1). 장면 전환(컷) 감지용 */
+  cutScore: number;
+}
+
 export interface Detector {
-  detect(frame: VideoFrame, timestampUs: number): Promise<Detection[]>;
+  detect(frame: VideoFrame, timestampUs: number): Promise<DetectResult>;
   close(): void;
 }
 
@@ -65,9 +71,32 @@ export async function createDetector(opts: DetectorOptions): Promise<Detector> {
 
   let lastTsMs = -1;
 
+  // 장면 전환 감지용 저해상도 서명 (16×16 썸네일 평균 차이)
+  const THUMB = 16;
+  const thumbCanvas = new OffscreenCanvas(THUMB, THUMB);
+  const thumbCtx = thumbCanvas.getContext('2d', { willReadFrequently: true })!;
+  let prevThumb: Uint8ClampedArray | null = null;
+
   return {
-    async detect(frame: VideoFrame, timestampUs: number): Promise<Detection[]> {
+    async detect(frame: VideoFrame, timestampUs: number): Promise<DetectResult> {
       await drawVideoFrame(ctx, frame, opts.rotation, cw, ch);
+
+      // 컷 스코어: 이전 프레임 썸네일과의 평균 절대 차이 (0..1)
+      thumbCtx.imageSmoothingEnabled = true;
+      thumbCtx.drawImage(canvas, 0, 0, cw, ch, 0, 0, THUMB, THUMB);
+      const thumb = thumbCtx.getImageData(0, 0, THUMB, THUMB).data;
+      let cutScore = 0;
+      if (prevThumb) {
+        let sum = 0;
+        for (let i = 0; i < thumb.length; i += 4) {
+          sum += Math.abs((thumb[i] ?? 0) - (prevThumb[i] ?? 0));
+          sum += Math.abs((thumb[i + 1] ?? 0) - (prevThumb[i + 1] ?? 0));
+          sum += Math.abs((thumb[i + 2] ?? 0) - (prevThumb[i + 2] ?? 0));
+        }
+        cutScore = sum / (THUMB * THUMB * 3 * 255);
+      }
+      prevThumb = new Uint8ClampedArray(thumb);
+
       // detectForVideo의 타임스탬프는 단조 증가여야 한다
       let tsMs = timestampUs / 1000;
       if (tsMs <= lastTsMs) tsMs = lastTsMs + 0.001;
@@ -87,7 +116,7 @@ export async function createDetector(opts: DetectorOptions): Promise<Detector> {
         if (box.w <= 0 || box.h <= 0) continue;
         out.push({ box, score: d.categories[0]?.score ?? 0 });
       }
-      return out;
+      return { detections: out, cutScore };
     },
     close(): void {
       detector.close();

@@ -20,6 +20,9 @@ export interface TrackOptions {
   smoothing: number; // 기본 0.6 — EMA 계수
   /** 폐기된 짧은 검출 알림 (리뷰 UI "짧은 검출 무시됨" 마커) */
   onDiscard?: (t: number) => void;
+  /** 장면 전환 프레임 타임스탬프. 유지/연장이 컷을 넘지 않게 한다 —
+   *  슬라이드쇼·편집 영상에서 이전 장면의 박스가 다음 장면을 덮는 것 방지 */
+  cuts?: number[];
 }
 
 const DEFAULTS: TrackOptions = {
@@ -44,6 +47,8 @@ export function buildTracks(
   const o: TrackOptions = { ...DEFAULTS, ...opts };
   const frames = [...perFrame].sort((a, b) => a.t - b.t);
   const timestamps = frames.map((f) => f.t);
+  const cutSet = new Set(o.cuts ?? []);
+  const cutsSorted = [...cutSet].sort((a, b) => a - b);
 
   const active: ActiveTrack[] = [];
   const finished: ActiveTrack[] = [];
@@ -57,6 +62,12 @@ export function buildTracks(
     const frame = frames[fi];
     if (!frame) continue;
     const { t, detections } = frame;
+
+    // 장면 전환: 이전 장면의 트랙을 모두 종료한다 (같은 위치라도 다른 사람이다)
+    if (cutSet.has(t) && active.length > 0) {
+      for (const tr of active) finalize(tr);
+      active.length = 0;
+    }
 
     // IoU greedy 매칭: (트랙, 검출) 쌍을 IoU 내림차순으로 소진
     const pairs: { ti: number; di: number; iou: number }[] = [];
@@ -143,8 +154,8 @@ export function buildTracks(
       if (first) o.onDiscard?.(first.t);
       continue;
     }
-    extendStart(tr.samples, timestamps, o.holdFrames);
-    extendEnd(tr.samples, timestamps, o.holdFrames);
+    extendStart(tr.samples, timestamps, o.holdFrames, cutsSorted);
+    extendEnd(tr.samples, timestamps, o.holdFrames, cutsSorted);
     out.push({
       id: `A${seq++}`,
       samples: tr.samples,
@@ -159,24 +170,28 @@ export function buildTracks(
   return out;
 }
 
-/** 트랙 시작을 holdFrames만큼 과거로 연장 (첫 박스 복제) */
-function extendStart(samples: TrackSample[], timestamps: number[], holdFrames: number): void {
+/** 트랙 시작을 holdFrames만큼 과거로 연장 (첫 박스 복제). 컷 경계는 넘지 않는다. */
+function extendStart(samples: TrackSample[], timestamps: number[], holdFrames: number, cuts: number[]): void {
   const first = samples[0];
   if (!first) return;
+  // 트랙이 속한 장면의 시작 컷 (컷 프레임 자체는 새 장면의 첫 프레임)
+  const sceneStart = latestCutAtOrBefore(cuts, first.t);
   const idx = lowerBound(timestamps, first.t);
   const prepend: TrackSample[] = [];
   for (let k = Math.max(0, idx - holdFrames); k < idx; k++) {
     const t = timestamps[k];
     if (t === undefined) continue;
+    if (sceneStart !== null && t < sceneStart) continue;
     prepend.push({ t, box: first.box, source: 'held' });
   }
   samples.unshift(...prepend);
 }
 
-/** 트랙 끝 연장 — miss 없이 영상이 끝났거나 held 꼬리가 짧을 때 채운다 */
-function extendEnd(samples: TrackSample[], timestamps: number[], holdFrames: number): void {
+/** 트랙 끝 연장 — miss 없이 영상이 끝났거나 held 꼬리가 짧을 때 채운다. 컷 경계는 넘지 않는다. */
+function extendEnd(samples: TrackSample[], timestamps: number[], holdFrames: number, cuts: number[]): void {
   const last = samples[samples.length - 1];
   if (!last) return;
+  const nextCut = earliestCutAfter(cuts, last.t);
   // 이미 붙어 있는 held 꼬리 길이만큼 차감
   let heldTail = 0;
   for (let i = samples.length - 1; i >= 0 && samples[i]?.source === 'held'; i--) heldTail++;
@@ -186,8 +201,25 @@ function extendEnd(samples: TrackSample[], timestamps: number[], holdFrames: num
   for (let k = idx + 1; k <= Math.min(timestamps.length - 1, idx + want); k++) {
     const t = timestamps[k];
     if (t === undefined) continue;
+    if (nextCut !== null && t >= nextCut) break;
     samples.push({ t, box: last.box, source: 'held' });
   }
+}
+
+function latestCutAtOrBefore(cuts: number[], t: number): number | null {
+  let result: number | null = null;
+  for (const c of cuts) {
+    if (c <= t) result = c;
+    else break;
+  }
+  return result;
+}
+
+function earliestCutAfter(cuts: number[], t: number): number | null {
+  for (const c of cuts) {
+    if (c > t) return c;
+  }
+  return null;
 }
 
 function lowerBound(arr: number[], v: number): number {

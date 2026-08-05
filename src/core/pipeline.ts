@@ -84,7 +84,7 @@ export async function analyze(
     throw new Error(`얼굴 검출기 초기화 실패: ${e instanceof Error ? e.message : e}`);
   });
 
-  const perFrame: { t: number; detections: Detection[] }[] = [];
+  const perFrame: { t: number; detections: Detection[]; cutScore: number }[] = [];
   const eta = new EtaEstimator();
   let done = 0;
 
@@ -95,8 +95,8 @@ export async function analyze(
       async (frame) => {
         try {
           const t = frame.timestamp;
-          const detections = await detector.detect(frame, t).catch(rethrowWithStage('프레임 분석'));
-          perFrame.push({ t, detections });
+          const { detections, cutScore } = await detector.detect(frame, t).catch(rethrowWithStage('프레임 분석'));
+          perFrame.push({ t, detections, cutScore });
         } finally {
           // 좌표만 남기고 프레임은 즉시 닫는다
           frame.close();
@@ -111,8 +111,13 @@ export async function analyze(
   }
 
   perFrame.sort((a, b) => a.t - b.t);
+
+  // 장면 전환(컷) 프레임: 유지/연장이 컷을 넘어 다른 장면을 덮지 않게 한다
+  const CUT_THRESHOLD = 0.16;
+  const cuts = perFrame.filter((f) => f.cutScore >= CUT_THRESHOLD).map((f) => f.t);
+
   const discardedShortAt: number[] = [];
-  const tracks: Track[] = buildTracks(perFrame, { onDiscard: (t) => discardedShortAt.push(t) });
+  const tracks: Track[] = buildTracks(perFrame, { onDiscard: (t) => discardedShortAt.push(t), cuts });
 
   const frames: FrameIndex = {
     timestampsUs: perFrame.map((f) => f.t),
