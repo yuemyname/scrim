@@ -140,6 +140,17 @@ export class Timeline {
 
     const dur = project.source.durationUs || 1;
 
+    // 장면 전환(컷) 마커 — 구간 길이를 조정할 때 컷 위치를 보고 맞출 수 있게
+    const cuts = this.state.frames?.cutsUs ?? [];
+    ctx.fillStyle = COLORS.line;
+    for (const c of cuts) {
+      const x = (c / dur) * W;
+      ctx.fillRect(x - 0.5, 0, 1, H);
+      ctx.fillStyle = COLORS.detected;
+      ctx.fillRect(x - 0.5, 0, 1, H * 0.3);
+      ctx.fillStyle = COLORS.line;
+    }
+
     // 선택 트랙 구간 바 + 양끝 핸들
     const sel = this.state.selectedTrack();
     if (sel && sel.samples.length > 0) {
@@ -234,6 +245,25 @@ export class Timeline {
     return frac * (this.state.project?.source.durationUs ?? 0);
   }
 
+  /** 핸들 드래그가 컷 근처(8px)면 컷 경계에 스냅 */
+  private snapToCut(e: PointerEvent, canvas: HTMLCanvasElement, t: number): number {
+    const cuts = this.state.frames?.cutsUs ?? [];
+    if (cuts.length === 0) return t;
+    const rect = canvas.getBoundingClientRect();
+    const dur = this.state.project?.source.durationUs || 1;
+    const thresholdUs = (8 / rect.width) * dur;
+    let best = t;
+    let bestDist = thresholdUs;
+    for (const c of cuts) {
+      const d = Math.abs(c - t);
+      if (d < bestDist) {
+        bestDist = d;
+        best = c;
+      }
+    }
+    return best;
+  }
+
   private bindPointer(): void {
     const down = (e: PointerEvent, canvas: HTMLCanvasElement): void => {
       canvas.setPointerCapture(e.pointerId);
@@ -269,7 +299,7 @@ export class Timeline {
       if (this.draggingHandle) {
         const sel = this.state.selectedTrack();
         if (sel) {
-          adjustTrackRange(sel, this.draggingHandle, this.timeAt(e, canvas));
+          adjustTrackRange(sel, this.draggingHandle, this.snapToCut(e, canvas, this.timeAt(e, canvas)));
           this.state.emit('project');
         }
         return;

@@ -80,7 +80,10 @@ export class Sidebar {
 
       const origin = document.createElement('span');
       origin.className = 'origin-tag';
-      origin.textContent = track.origin === 'manual' ? '수동' : '';
+      // 자동 트랙은 평균 검출 신뢰도를 표시 — 낮으면(50% 미만) 오검출 의심
+      origin.textContent =
+        track.origin === 'manual' ? '수동' : track.avgScore !== undefined ? `${Math.round(track.avgScore * 100)}%` : '';
+      if (track.origin === 'auto' && (track.avgScore ?? 1) < 0.5) origin.title = '신뢰도가 낮습니다 — 오검출인지 확인하세요';
 
       const del = document.createElement('button');
       del.className = 'track-delete';

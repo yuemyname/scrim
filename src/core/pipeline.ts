@@ -123,6 +123,7 @@ export async function analyze(
     timestampsUs: perFrame.map((f) => f.t),
     detectionCounts: perFrame.map((f) => f.detections.length),
     discardedShortAt,
+    cutsUs: cuts,
   };
 
   const project: Project = {

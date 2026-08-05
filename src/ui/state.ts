@@ -31,6 +31,7 @@ export class AppState {
   manualSeq = 0;
 
   private undoStack: Snapshot[] = [];
+  private redoStack: Snapshot[] = [];
   private listeners = new Map<StateEvent, Set<() => void>>();
 
   on(event: StateEvent, fn: () => void): void {
@@ -42,26 +43,45 @@ export class AppState {
     for (const fn of this.listeners.get(event) ?? []) fn();
   }
 
-  /** 변경 직전에 호출 — 프로젝트 상태 스냅샷 (깊이 50) */
+  private snapshot(): Snapshot {
+    return {
+      tracks: structuredClone(this.project!.tracks),
+      globalStyle: structuredClone(this.project!.globalStyle),
+    };
+  }
+
+  private restore(snap: Snapshot): void {
+    this.project!.tracks = snap.tracks;
+    this.project!.globalStyle = snap.globalStyle;
+    if (this.selectedTrackId && !this.project!.tracks.some((t) => t.id === this.selectedTrackId)) {
+      this.selectedTrackId = null;
+      this.emit('selection');
+    }
+    this.emit('project');
+  }
+
+  /** 변경 직전에 호출 — 프로젝트 상태 스냅샷 (깊이 50). 새 변경은 redo 히스토리를 무효화한다 */
   pushUndo(): void {
     if (!this.project) return;
-    this.undoStack.push({
-      tracks: structuredClone(this.project.tracks),
-      globalStyle: structuredClone(this.project.globalStyle),
-    });
+    this.undoStack.push(this.snapshot());
     if (this.undoStack.length > UNDO_DEPTH) this.undoStack.shift();
+    this.redoStack.length = 0;
   }
 
   undo(): boolean {
     const snap = this.undoStack.pop();
     if (!snap || !this.project) return false;
-    this.project.tracks = snap.tracks;
-    this.project.globalStyle = snap.globalStyle;
-    if (this.selectedTrackId && !this.project.tracks.some((t) => t.id === this.selectedTrackId)) {
-      this.selectedTrackId = null;
-      this.emit('selection');
-    }
-    this.emit('project');
+    this.redoStack.push(this.snapshot());
+    this.restore(snap);
+    return true;
+  }
+
+  redo(): boolean {
+    const snap = this.redoStack.pop();
+    if (!snap || !this.project) return false;
+    this.undoStack.push(this.snapshot());
+    if (this.undoStack.length > UNDO_DEPTH) this.undoStack.shift();
+    this.restore(snap);
     return true;
   }
 

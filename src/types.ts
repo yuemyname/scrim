@@ -45,6 +45,8 @@ export interface Track {
   /** null이면 globalStyle 상속 */
   style: RedactStyle | null;
   origin: 'auto' | 'manual';
+  /** 자동 트랙의 평균 검출 신뢰도 (0..1). 낮으면 오검출 의심 — 리뷰 UI 표시용 */
+  avgScore?: number;
 }
 
 export interface SourceMeta {
@@ -75,6 +77,8 @@ export interface FrameIndex {
   detectionCounts: number[];
   /** minTrackFrames 미만으로 폐기된 짧은 검출의 발생 시각 */
   discardedShortAt: number[];
+  /** 장면 전환(컷) 프레임 타임스탬프 — 타임라인 마커·스냅용 */
+  cutsUs: number[];
 }
 
 export interface Progress {

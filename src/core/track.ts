@@ -37,6 +37,7 @@ interface ActiveTrack {
   box: Box; // 스무딩된 현재 박스
   missCount: number;
   detectedCount: number;
+  scoreSum: number;
   lastDetectedIdx: number; // samples 내에서 마지막 'detected' 위치
 }
 
@@ -112,6 +113,7 @@ export function buildTracks(
       tr.samples.push({ t, box: tr.box, source: 'detected' });
       tr.missCount = 0;
       tr.detectedCount++;
+      tr.scoreSum += det.score;
       tr.lastDetectedIdx = tr.samples.length - 1;
     }
 
@@ -139,6 +141,7 @@ export function buildTracks(
         box: det.box,
         missCount: 0,
         detectedCount: 1,
+        scoreSum: det.score,
         lastDetectedIdx: 0,
       });
     }
@@ -162,6 +165,7 @@ export function buildTracks(
       enabled: true,
       style: null,
       origin: 'auto',
+      avgScore: tr.detectedCount > 0 ? tr.scoreSum / tr.detectedCount : 0,
     });
   }
   out.sort((a, b) => (a.samples[0]?.t ?? 0) - (b.samples[0]?.t ?? 0));

@@ -124,6 +124,23 @@ export class Player {
     this.root.style.height = `${Math.max(1, Math.floor(vh * scale))}px`;
   }
 
+  /** 무거운 인코딩 뒤 Safari가 비디오 디코더를 회수하면 시킹이 멈춘다 —
+   *  소스를 다시 로드해 디코더를 재확보하고 위치를 복원한다. */
+  refresh(): void {
+    const t = this.state.currentUs / 1e6;
+    const src = this.video.src;
+    if (!src) return;
+    this.video.load();
+    this.video.addEventListener(
+      'loadedmetadata',
+      () => {
+        this.video.currentTime = t;
+        this.requestDraw();
+      },
+      { once: true },
+    );
+  }
+
   togglePlay(): void {
     if (this.video.paused) void this.video.play();
     else this.video.pause();

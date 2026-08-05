@@ -78,6 +78,7 @@ class App {
   private longSide = 512;
   private minConfidence = 0.35;
   private rendering = false;
+  private player: Player | null = null;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -285,6 +286,7 @@ class App {
     const stage = document.createElement('div');
     stage.className = 'stage';
     const player = new Player(state);
+    this.player = player;
     stage.appendChild(player.root);
     const sidebar = new Sidebar(state);
     workspace.append(stage, sidebar.root);
@@ -327,6 +329,14 @@ class App {
       else toast('되돌릴 작업이 없습니다');
     });
 
+    const redoBtn = document.createElement('button');
+    redoBtn.textContent = '다시 실행';
+    redoBtn.title = 'Cmd/Ctrl+Shift+Z';
+    redoBtn.addEventListener('click', () => {
+      if (state.redo()) toast('다시 실행했습니다');
+      else toast('다시 실행할 작업이 없습니다');
+    });
+
     const spacer = document.createElement('span');
     spacer.className = 'spacer';
 
@@ -338,7 +348,7 @@ class App {
     exportBtn.textContent = '내보내기';
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
-    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, spacer, hazardCount, exportBtn);
+    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, spacer, hazardCount, exportBtn);
 
     const timeline = new Timeline(state);
     timeline.onHazardCountChange = (count) => {
@@ -403,9 +413,15 @@ class App {
           this.state.emit('project');
           toast(`${sel.id} 트랙을 삭제했습니다`);
         }
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) {
+        e.preventDefault();
+        if (this.state.redo()) toast('다시 실행했습니다');
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (this.state.undo()) toast('되돌렸습니다');
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        if (this.state.redo()) toast('다시 실행했습니다');
       }
     });
   }
@@ -522,6 +538,8 @@ class App {
     } finally {
       this.rendering = false;
       state.phase = 'review';
+      // 무거운 인코딩 뒤 비디오 디코더가 회수돼 시킹이 멈추는 것 방지
+      this.player?.refresh();
     }
   }
 }
