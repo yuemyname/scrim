@@ -168,31 +168,33 @@ export function redactFrame(
     work.drawImage(maskCanvas!, 0, 0, w, h, 0, 0, w, h);
     work.globalCompositeOperation = 'source-over';
 
-    // 2.5) 스티커: 마스크 적용 후 이모지/문구를 온전한 형태로 얹는다
-    if (style.kind === 'sticker') {
-      const text = (style.sticker ?? '🙂').trim() || '🙂';
-      work.save();
-      work.textAlign = 'center';
-      work.textBaseline = 'middle';
-      // 짧은 변의 90%에서 시작해 폭에 맞게 축소
-      let fontPx = short * 0.9;
-      work.font = `${fontPx}px sans-serif`;
-      const measured = work.measureText(text).width;
-      if (measured > w * 0.95) {
-        fontPx = (fontPx * (w * 0.95)) / Math.max(1, measured);
-        work.font = `${fontPx}px sans-serif`;
-      }
-      // 문구(비이모지)일 때 가독성을 위한 흰 글자 + 어두운 윤곽
-      work.strokeStyle = 'rgba(0,0,0,0.7)';
-      work.lineWidth = Math.max(1, fontPx * 0.06);
-      work.fillStyle = '#FFFFFF';
-      work.strokeText(text, w / 2, h / 2);
-      work.fillText(text, w / 2, h / 2);
-      work.restore();
-    }
-
     // 3) 본 캔버스에 합성
     ctx.drawImage(workCanvas!, 0, 0, w, h, x, y, w, h);
+
+    // 4) 스티커: 박스보다 크게(1.4×) 본 캔버스에 직접 그린다 — 글리프가 얼굴을
+    //    통째로 덮어 "이모지로 바뀐" 느낌을 준다. 글리프 가장자리의 투명 영역은
+    //    아래에 깔린 모자이크 바탕이 막아주므로 비식별화 보장은 유지된다.
+    if (style.kind === 'sticker') {
+      const text = (style.sticker ?? '🙂').trim() || '🙂';
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      let fontPx = short * 1.4;
+      ctx.font = `${fontPx}px sans-serif`;
+      const measured = ctx.measureText(text).width;
+      const maxW = w * 1.35; // 문구는 박스 폭의 1.35배까지 허용 (살짝 넘치는 게 의도)
+      if (measured > maxW) {
+        fontPx = (fontPx * maxW) / Math.max(1, measured);
+        ctx.font = `${fontPx}px sans-serif`;
+      }
+      // 문구(비이모지)일 때 가독성을 위한 흰 글자 + 어두운 윤곽
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = Math.max(1, fontPx * 0.06);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeText(text, x + w / 2, y + h / 2);
+      ctx.fillText(text, x + w / 2, y + h / 2);
+      ctx.restore();
+    }
   }
 }
 

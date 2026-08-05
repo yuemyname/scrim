@@ -480,6 +480,8 @@ export class Player {
       origin: 'manual',
     };
     project.tracks.push(track);
+    // 새로 그린 수동 박스만 선택 상태가 되도록 기존 선택·체크를 모두 해제한다
+    this.state.checkedIds.clear();
     this.state.selectedTrackId = track.id;
     this.state.emit('project');
     this.state.emit('selection');
