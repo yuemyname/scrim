@@ -9,7 +9,7 @@ import { Timeline } from './ui/timeline';
 import { Sidebar } from './ui/panels';
 import { PipelineClient } from './worker/client';
 import { openModal, openPrivacyModal, openProgressModal } from './ui/modal';
-import { saveBlob, exportProjectJson, parseProjectJson } from './ui/save';
+import { saveBlob, exportProjectJson, parseProjectJson, parseProjectFile, type SavedProject } from './ui/save';
 import { toast } from './ui/toast';
 import { timecode } from './ui/format';
 import { nearestIndex } from './ui/frameState';
@@ -19,6 +19,16 @@ const app = document.getElementById('app');
 if (!app) throw new Error('#app not found');
 
 const LONG_VIDEO_WARN_US = 5 * 60 * 1_000_000;
+
+/** 수동 트랙 ID 시퀀스 복원 — 개수가 아니라 최대 번호 기준 (삭제된 번호와 충돌 방지) */
+function maxManualSeq(tracks: { id: string; origin: string }[]): number {
+  let max = 0;
+  for (const t of tracks) {
+    const m = /^M(\d+)$/.exec(t.id);
+    if (t.origin === 'manual' && m) max = Math.max(max, Number(m[1]));
+  }
+  return max;
+}
 
 function featureSupported(): boolean {
   return (
@@ -167,8 +177,126 @@ class App {
 
     options.append(label, select, senseLabel, senseSelect);
 
-    landing.append(drop, options);
+    const resumeBtn = document.createElement('button');
+    resumeBtn.textContent = '저장한 프로젝트 이어서 작업';
+    resumeBtn.addEventListener('click', () => this.resumeProject());
+
+    landing.append(drop, options, resumeBtn);
     this.root.append(buildTopbar(() => this.fileInput.click()), landing, buildPrivacyFooter());
+  }
+
+  /** 랜딩에서 프로젝트 JSON → 영상 파일 순으로 골라 재분석 없이 복원한다 */
+  private resumeProject(): void {
+    const jsonInput = document.createElement('input');
+    jsonInput.type = 'file';
+    jsonInput.accept = 'application/json,.json';
+    jsonInput.style.display = 'none';
+    document.body.appendChild(jsonInput);
+    jsonInput.addEventListener('change', async () => {
+      const jf = jsonInput.files?.[0];
+      jsonInput.remove();
+      if (!jf) return;
+      const parsed = parseProjectFile(await jf.text());
+      if (!parsed.ok || !parsed.saved) {
+        toast(parsed.reason ?? '프로젝트 파일을 읽을 수 없습니다.');
+        return;
+      }
+      const saved = parsed.saved;
+      openModal((modal, close) => {
+        const h = document.createElement('h3');
+        h.textContent = '영상 파일 선택';
+        const desc = document.createElement('p');
+        desc.textContent = `이 프로젝트는 '${saved.source.fileName}' 영상의 작업본입니다. 영상 파일은 프로젝트에 저장되지 않으므로 같은 파일을 다시 선택해 주세요.`;
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+        const cancel = document.createElement('button');
+        cancel.textContent = '취소';
+        cancel.addEventListener('click', close);
+        const pick = document.createElement('button');
+        pick.className = 'primary';
+        pick.textContent = '영상 선택';
+        pick.addEventListener('click', () => {
+          close();
+          const videoInput = document.createElement('input');
+          videoInput.type = 'file';
+          videoInput.accept = 'video/mp4,video/quicktime,.mp4,.mov';
+          videoInput.style.display = 'none';
+          document.body.appendChild(videoInput);
+          videoInput.addEventListener('change', () => {
+            const vf = videoInput.files?.[0];
+            videoInput.remove();
+            if (vf) void this.applySavedProject(saved, vf);
+          });
+          videoInput.click();
+        });
+        actions.append(cancel, pick);
+        modal.append(h, desc, actions);
+      });
+    });
+    jsonInput.click();
+  }
+
+  private async applySavedProject(saved: SavedProject, file: File): Promise<void> {
+    // 파일 매칭 검증: 크기가 저장돼 있으면 크기, 아니면 이름으로
+    const sizeMismatch = saved.fileSizeBytes !== undefined && saved.fileSizeBytes !== file.size;
+    const nameMismatch = saved.source.fileName !== file.name;
+    if (sizeMismatch || nameMismatch) {
+      const proceed = await new Promise<boolean>((resolve) => {
+        openModal((modal, close) => {
+          const h = document.createElement('h3');
+          h.textContent = '영상이 프로젝트와 다를 수 있습니다';
+          const p = document.createElement('p');
+          p.textContent = sizeMismatch
+            ? '선택한 파일의 크기가 저장 당시와 다릅니다. 다른 영상이면 박스 위치가 어긋납니다.'
+            : `파일 이름이 다릅니다 (저장 당시: ${saved.source.fileName}). 같은 영상이 맞는지 확인하세요.`;
+          const actions = document.createElement('div');
+          actions.className = 'actions';
+          const no = document.createElement('button');
+          no.textContent = '취소';
+          no.addEventListener('click', () => {
+            close();
+            resolve(false);
+          });
+          const yes = document.createElement('button');
+          yes.className = 'primary';
+          yes.textContent = '계속하기';
+          yes.addEventListener('click', () => {
+            close();
+            resolve(true);
+          });
+          actions.append(no, yes);
+          modal.append(h, p, actions);
+        });
+      });
+      if (!proceed) return;
+    }
+
+    if (saved.frames) {
+      // 분석 색인이 저장돼 있으면 재분석 없이 즉시 복원
+      const state = this.state;
+      state.file = file;
+      state.project = { version: 1, source: saved.source, tracks: saved.tracks, globalStyle: saved.globalStyle };
+      state.frames = saved.frames;
+      state.currentUs = 0;
+      state.phase = 'review';
+      state.manualSeq = maxManualSeq(saved.tracks);
+      this.renderReview();
+      toast('프로젝트를 불러왔습니다');
+    } else {
+      // 구버전 저장본: 분석 후 트랙만 덮어쓴다
+      await this.openFile(file);
+      const project = this.state.project;
+      if (!project) return;
+      if (Math.abs(project.source.durationUs - saved.source.durationUs) > 50_000) {
+        toast('영상 길이가 프로젝트와 다릅니다. 다른 영상인지 확인하세요.');
+        return;
+      }
+      project.tracks = saved.tracks;
+      project.globalStyle = saved.globalStyle;
+      this.state.manualSeq = maxManualSeq(saved.tracks);
+      this.state.emit('project');
+      toast('프로젝트를 불러왔습니다');
+    }
   }
 
   private async openFile(file: File): Promise<void> {
@@ -251,7 +379,7 @@ class App {
     saveProj.textContent = '프로젝트 저장';
     saveProj.addEventListener('click', () => {
       void saveBlob(
-        exportProjectJson(project),
+        exportProjectJson(project, state.frames, file.size),
         `${file.name.replace(/\.[^.]+$/, '')}.scrim.json`,
         'application/json',
         '.json',
@@ -278,7 +406,7 @@ class App {
       state.pushUndo();
       project.tracks = result.project.tracks;
       project.globalStyle = result.project.globalStyle;
-      state.manualSeq = project.tracks.filter((t) => t.origin === 'manual').length;
+      state.manualSeq = maxManualSeq(project.tracks);
       state.emit('project');
       toast('프로젝트를 불러왔습니다');
     });

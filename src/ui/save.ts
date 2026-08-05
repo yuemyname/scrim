@@ -2,7 +2,7 @@
  * 파일 저장 (내보낸 mp4, 프로젝트 JSON).
  * iPad Safari는 showSaveFilePicker 미지원 → a[download] + Blob URL 폴백.
  */
-import type { Project } from '../types';
+import type { FrameIndex, Project } from '../types';
 
 interface SaveFilePickerWindow {
   showSaveFilePicker?: (opts: {
@@ -39,28 +39,52 @@ export async function saveBlob(blob: Blob, suggestedName: string, mime: string, 
   return true;
 }
 
-export function exportProjectJson(project: Project): Blob {
-  return new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+/**
+ * 저장 파일 형식: Project + 분석 색인(frames) + 원본 파일 크기.
+ * frames를 함께 저장하면 랜딩에서 재분석 없이 즉시 이어서 작업할 수 있다.
+ */
+export interface SavedProject extends Project {
+  frames?: FrameIndex;
+  fileSizeBytes?: number;
 }
 
-export interface ProjectLoadResult {
+export function exportProjectJson(project: Project, frames: FrameIndex | null, fileSizeBytes: number): Blob {
+  const saved: SavedProject = { ...project, ...(frames ? { frames } : {}), fileSizeBytes };
+  return new Blob([JSON.stringify(saved, null, 2)], { type: 'application/json' });
+}
+
+export interface ProjectParseResult {
   ok: boolean;
-  project?: Project;
+  saved?: SavedProject;
   reason?: string;
 }
 
-/** 프로젝트 JSON 불러오기. 영상 파일은 포함되지 않으므로 fileName + durationUs로 매칭을 검증한다. */
-export function parseProjectJson(text: string, expect: { fileName: string; durationUs: number }): ProjectLoadResult {
+/** 형식 검증만 하는 파싱 (영상 매칭은 호출자가 판단) */
+export function parseProjectFile(text: string): ProjectParseResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
     return { ok: false, reason: '프로젝트 파일을 읽을 수 없습니다.' };
   }
-  const p = parsed as Project;
+  const p = parsed as SavedProject;
   if (p?.version !== 1 || !p.source || !Array.isArray(p.tracks)) {
     return { ok: false, reason: '프로젝트 파일 형식이 아닙니다.' };
   }
+  return { ok: true, saved: p };
+}
+
+export interface ProjectLoadResult {
+  ok: boolean;
+  project?: SavedProject;
+  reason?: string;
+}
+
+/** 리뷰 화면용: 열린 영상과의 매칭(fileName + durationUs)까지 검증한다. */
+export function parseProjectJson(text: string, expect: { fileName: string; durationUs: number }): ProjectLoadResult {
+  const parsed = parseProjectFile(text);
+  if (!parsed.ok || !parsed.saved) return { ok: false, reason: parsed.reason };
+  const p = parsed.saved;
   if (p.source.fileName !== expect.fileName || Math.abs(p.source.durationUs - expect.durationUs) > 50_000) {
     return {
       ok: false,
