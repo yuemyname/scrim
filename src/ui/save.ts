@@ -3,6 +3,7 @@
  * iPad Safari는 showSaveFilePicker 미지원 → a[download] + Blob URL 폴백.
  */
 import type { FrameIndex, Project } from '../types';
+import { t } from './i18n';
 
 export async function saveBlob(blob: Blob, suggestedName: string, _mime: string, _ext: string): Promise<boolean> {
   // showSaveFilePicker는 브라우저별 동작 편차가 커서(iPad 미지원, 제스처 제약)
@@ -44,11 +45,11 @@ export function parseProjectFile(text: string): ProjectParseResult {
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { ok: false, reason: '프로젝트 파일을 읽을 수 없습니다.' };
+    return { ok: false, reason: t('projUnreadable') };
   }
   const p = parsed as SavedProject;
   if (p?.version !== 1 || !p.source || !Array.isArray(p.tracks)) {
-    return { ok: false, reason: '프로젝트 파일 형식이 아닙니다.' };
+    return { ok: false, reason: t('projBadFormat') };
   }
   // 구버전 호환: 제거된 'solid'는 모자이크로 변환
   const normalize = (st: { kind: string } | null | undefined): void => {
@@ -71,10 +72,7 @@ export function parseProjectJson(text: string, expect: { fileName: string; durat
   if (!parsed.ok || !parsed.saved) return { ok: false, reason: parsed.reason };
   const p = parsed.saved;
   if (p.source.fileName !== expect.fileName || Math.abs(p.source.durationUs - expect.durationUs) > 50_000) {
-    return {
-      ok: false,
-      reason: `다른 영상의 프로젝트입니다 (${p.source.fileName}). 같은 영상을 연 상태에서 불러오세요.`,
-    };
+    return { ok: false, reason: t('projMismatch', { name: p.source.fileName }) };
   }
   return { ok: true, project: p };
 }

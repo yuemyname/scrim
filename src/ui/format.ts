@@ -1,4 +1,5 @@
 /** 타임코드 등 표기 유틸. 시간과 좌표는 영상 편집의 어휘 — 고정폭으로 다룬다. */
+import { t } from './i18n';
 
 export function timecode(us: number): string {
   const totalS = us / 1e6;
@@ -20,6 +21,6 @@ export function shortTime(us: number): string {
 export function etaText(ms: number): string {
   if (ms <= 0) return '';
   const s = Math.round(ms / 1000);
-  if (s < 60) return `약 ${s}초 남음`;
-  return `약 ${Math.floor(s / 60)}분 ${s % 60}초 남음`;
+  if (s < 60) return t('etaSec', { s });
+  return t('etaMin', { m: Math.floor(s / 60), s: s % 60 });
 }

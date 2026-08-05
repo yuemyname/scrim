@@ -76,10 +76,13 @@ button.primary {
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
   flex: none;
+}
+.topbar > .brand {
+  margin-right: auto;
 }
 .topbar .topbar-right {
   display: flex;

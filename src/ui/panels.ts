@@ -7,6 +7,7 @@ import type { RedactStyle } from '../types';
 import type { AppState } from './state';
 import { shortTime } from './format';
 import { trackColor } from './colors';
+import { t } from './i18n';
 
 export class Sidebar {
   readonly root: HTMLElement;
@@ -53,7 +54,7 @@ export class Sidebar {
     if (project.tracks.length === 0) {
       const note = document.createElement('div');
       note.className = 'empty-note';
-      note.textContent = '얼굴을 찾지 못했습니다. 화면 위에서 드래그해 수동으로 지정하세요.';
+      note.textContent = t('emptyNote');
       this.listEl.after(note);
       return;
     }
@@ -69,7 +70,7 @@ export class Sidebar {
 
     const allChecked = checked.length === project.tracks.length;
     this.batchEl.append(
-      act(allChecked ? '전체 해제' : '전체 선택', () => {
+      act(allChecked ? t('deselectAll') : t('selectAll'), () => {
         this.state.checkedIds.clear();
         if (!allChecked) for (const t of project.tracks) this.state.checkedIds.add(t.id);
         this.state.emit('selection');
@@ -78,20 +79,20 @@ export class Sidebar {
 
     if (checked.length > 0) {
       const label = document.createElement('span');
-      label.textContent = `${checked.length}개 선택`;
+      label.textContent = t('nSelected', { n: checked.length });
       this.batchEl.append(
         label,
-        act('끄기', () => {
+        act(t('turnOff'), () => {
           this.state.pushUndo();
           for (const t of checked) t.enabled = false;
           this.state.emit('project');
         }),
-        act('켜기', () => {
+        act(t('turnOn'), () => {
           this.state.pushUndo();
           for (const t of checked) t.enabled = true;
           this.state.emit('project');
         }),
-        act('삭제', () => {
+        act(t('delete'), () => {
           this.state.pushUndo();
           const ids = new Set(checked.map((t) => t.id));
           project.tracks = project.tracks.filter((t) => !ids.has(t.id));
@@ -112,13 +113,13 @@ export class Sidebar {
       check.type = 'checkbox';
       check.className = 'track-check';
       check.checked = this.state.checkedIds.has(track.id);
-      check.title = '일괄 수정 대상으로 선택';
+      check.title = t('checkTip');
       check.addEventListener('click', (e) => e.stopPropagation());
       check.addEventListener('change', () => this.state.toggleChecked(track.id));
 
       const dot = document.createElement('span');
       dot.className = 'dot';
-      dot.title = track.enabled ? '가림 켜짐 — 누르면 끕니다' : '가림 꺼짐 — 누르면 켭니다';
+      dot.title = track.enabled ? t('dotOnTip') : t('dotOffTip');
       // 화면의 박스 보더 색과 동일한 색으로 트랙을 식별한다
       const color = trackColor(track.id);
       dot.style.borderColor = color;
@@ -144,13 +145,13 @@ export class Sidebar {
       origin.className = 'origin-tag';
       // 자동 트랙은 평균 검출 신뢰도를 표시 — 낮으면(50% 미만) 오검출 의심
       origin.textContent =
-        track.origin === 'manual' ? '수동' : track.avgScore !== undefined ? `${Math.round(track.avgScore * 100)}%` : '';
-      if (track.origin === 'auto' && (track.avgScore ?? 1) < 0.5) origin.title = '신뢰도가 낮습니다 — 오검출인지 확인하세요';
+        track.origin === 'manual' ? t('manualTag') : track.avgScore !== undefined ? `${Math.round(track.avgScore * 100)}%` : '';
+      if (track.origin === 'auto' && (track.avgScore ?? 1) < 0.5) origin.title = t('lowConfTip');
 
       const del = document.createElement('button');
       del.className = 'track-delete';
       del.textContent = '✕';
-      del.title = '트랙 삭제';
+      del.title = t('trackDeleteTip');
       del.addEventListener('click', (e) => {
         e.stopPropagation();
         this.state.pushUndo();
@@ -206,23 +207,25 @@ export class Sidebar {
     target.className = 'row';
     target.style.color = 'var(--ink-muted)';
     target.textContent = isBatch
-      ? `${checked.length}개 트랙 일괄 수정`
+      ? t('batchEditing', { n: checked.length })
       : sel
-        ? `${sel.id} 트랙 스타일${isOverride ? ' (개별)' : ' (전체 상속)'}`
-        : '전체 스타일';
+        ? isOverride
+          ? t('trackStyleCustom', { id: sel.id })
+          : t('trackStyleInherit', { id: sel.id })
+        : t('globalStyleLabel');
     this.styleEl.appendChild(target);
 
     // 종류 세그먼트
     const kindRow = document.createElement('div');
     kindRow.className = 'row';
     const kindLabel = document.createElement('label');
-    kindLabel.textContent = '종류';
+    kindLabel.textContent = t('kind');
     const seg = document.createElement('div');
     seg.className = 'seg';
     const kinds: { k: RedactStyle['kind']; label: string; title?: string }[] = [
-      { k: 'mosaic', label: '모자이크' },
-      { k: 'blur', label: '블러', title: '블러는 반경이 작으면 복원될 수 있어 최소 강도가 강제됩니다' },
-      { k: 'sticker', label: '스티커', title: '모자이크 바탕 위에 이모지/문구를 얹습니다' },
+      { k: 'mosaic', label: t('mosaic') },
+      { k: 'blur', label: t('blur'), title: t('blurTip') },
+      { k: 'sticker', label: t('sticker'), title: t('stickerTip') },
     ];
     for (const { k, label, title } of kinds) {
       const b = document.createElement('button');
@@ -268,21 +271,21 @@ export class Sidebar {
     };
 
     if (style.kind === 'mosaic') {
-      slider('강도', style.strength, 0.04, 0.3, 0.01, (v) => apply((s) => (s.strength = v)));
+      slider(t('strength'), style.strength, 0.04, 0.3, 0.01, (v) => apply((s) => (s.strength = v)));
     } else if (style.kind === 'blur') {
-      slider('강도', Math.max(style.strength, 12), 12, 60, 1, (v) => apply((s) => (s.strength = v)));
+      slider(t('strength'), Math.max(style.strength, 12), 12, 60, 1, (v) => apply((s) => (s.strength = v)));
     } else if (style.kind === 'sticker') {
       // 이모지/문구 입력 + 빠른 선택
       const row = document.createElement('div');
       row.className = 'row';
       const l = document.createElement('label');
-      l.textContent = '내용';
+      l.textContent = t('content');
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'sticker-input';
       input.maxLength = 20;
       input.value = style.sticker ?? '🙂';
-      input.placeholder = '🙂 또는 문구';
+      input.placeholder = t('stickerPlaceholder');
       let pushed = false;
       input.addEventListener('input', () => {
         if (!pushed) {
@@ -305,19 +308,19 @@ export class Sidebar {
       }
       this.styleEl.appendChild(presets);
     }
-    slider('여백', style.scale, 1.0, 2.2, 0.05, (v) => apply((s) => (s.scale = v)));
-    slider('페더', style.feather, 0, 0.6, 0.05, (v) => apply((s) => (s.feather = v)));
+    slider(t('margin'), style.scale, 1.0, 2.2, 0.05, (v) => apply((s) => (s.scale = v)));
+    slider(t('feather'), style.feather, 0, 0.6, 0.05, (v) => apply((s) => (s.feather = v)));
 
     // 모양 세그먼트
     const shapeRow = document.createElement('div');
     shapeRow.className = 'row';
     const shapeLabel = document.createElement('label');
-    shapeLabel.textContent = '모양';
+    shapeLabel.textContent = t('shape');
     const shapeSeg = document.createElement('div');
     shapeSeg.className = 'seg';
     for (const { k, label } of [
-      { k: 'ellipse' as const, label: '타원' },
-      { k: 'rect' as const, label: '사각' },
+      { k: 'ellipse' as const, label: t('ellipse') },
+      { k: 'rect' as const, label: t('rect') },
     ]) {
       const b = document.createElement('button');
       b.textContent = label;
@@ -330,7 +333,7 @@ export class Sidebar {
 
     if (targets.length > 0 && targets.some((t) => t.style)) {
       const reset = document.createElement('button');
-      reset.textContent = isBatch ? '선택 트랙들 전체 스타일로 되돌리기' : '전체 스타일로 되돌리기';
+      reset.textContent = isBatch ? t('resetBatch') : t('resetOne');
       reset.addEventListener('click', () => {
         this.state.pushUndo();
         for (const t of targets) t.style = null;

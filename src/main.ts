@@ -14,6 +14,7 @@ import { toast } from './ui/toast';
 import { timecode } from './ui/format';
 import { nearestIndex } from './ui/frameState';
 import { verifyAssets } from './core/assets';
+import { t, currentLang, setLang } from './ui/i18n';
 import { sampleTrackAt } from './core/track';
 import { redactFrame } from './core/redact';
 
@@ -48,23 +49,34 @@ function renderUnsupported(root: HTMLElement): void {
   const box = document.createElement('div');
   box.className = 'dropzone';
   box.style.cursor = 'default';
-  box.innerHTML =
-    '이 브라우저는 영상 처리 기능(WebCodecs)을 지원하지 않습니다.<br />' +
-    'Safari 16.4+, Chrome 94+, Firefox 130+ 에서 열어 주세요.';
+  box.innerHTML = t('unsupportedBrowser');
   landing.appendChild(box);
-  root.append(buildTopbar(null), landing, buildPrivacyFooter());
+  root.append(buildTopbar(null, () => renderUnsupported(root)), landing, buildPrivacyFooter());
 }
 
-function buildTopbar(onOpen: (() => void) | null): HTMLElement {
+function buildTopbar(onOpen: (() => void) | null, onLangChange?: () => void): HTMLElement {
   const bar = document.createElement('header');
   bar.className = 'topbar';
   const brand = document.createElement('span');
   brand.className = 'brand';
   brand.textContent = APP_NAME;
   bar.appendChild(brand);
+
+  if (onLangChange) {
+    const langBtn = document.createElement('button');
+    langBtn.className = 'lang-toggle';
+    langBtn.textContent = currentLang() === 'ko' ? 'EN' : '한국어';
+    langBtn.title = currentLang() === 'ko' ? 'Switch to English' : '한국어로 전환';
+    langBtn.addEventListener('click', () => {
+      setLang(currentLang() === 'ko' ? 'en' : 'ko');
+      onLangChange();
+    });
+    bar.appendChild(langBtn);
+  }
+
   if (onOpen) {
     const openBtn = document.createElement('button');
-    openBtn.textContent = '영상·사진 열기';
+    openBtn.textContent = t('open');
     openBtn.addEventListener('click', onOpen);
     bar.appendChild(openBtn);
   }
@@ -123,7 +135,7 @@ class App {
 
     const drop = document.createElement('div');
     drop.className = 'dropzone';
-    drop.innerHTML = '영상이나 사진을 끌어다 놓으세요.<br />파일은 이 브라우저를 벗어나지 않습니다.';
+    drop.innerHTML = `${t('dropLine1')}<br />${t('dropLine2')}`;
     drop.addEventListener('click', () => this.fileInput.click());
     drop.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -140,12 +152,12 @@ class App {
     const options = document.createElement('div');
     options.className = 'options';
     const senseLabel = document.createElement('span');
-    senseLabel.textContent = '검출 민감도';
+    senseLabel.textContent = t('sensitivity');
     const senseSelect = document.createElement('select');
     for (const [v, text] of [
-      ['0.35', '민감 — 놓침 최소 (기본)'],
-      ['0.5', '표준'],
-      ['0.65', '보수 — 잘못 가림 최소'],
+      ['0.35', t('senseSensitive')],
+      ['0.5', t('senseStandard')],
+      ['0.65', t('senseConservative')],
     ] as const) {
       const opt = document.createElement('option');
       opt.value = v;
@@ -158,20 +170,38 @@ class App {
     options.append(senseLabel, senseSelect);
 
     landing.append(drop, options);
-    this.root.append(buildTopbar(() => this.fileInput.click()), landing, buildPrivacyFooter());
+    this.root.append(
+      buildTopbar(
+        () => this.fileInput.click(),
+        () => this.rerenderCurrent(),
+      ),
+      landing,
+      buildPrivacyFooter(),
+    );
+  }
+
+  /** 언어 전환 후 현재 화면을 다시 그린다 (리뷰 상태·재생 위치 유지) */
+  private rerenderCurrent(): void {
+    if (this.state.phase === 'review' && this.state.project) {
+      const keepUs = this.state.currentUs;
+      this.renderReview();
+      this.state.setTime(keepUs);
+    } else {
+      this.renderLanding();
+    }
   }
 
   private async openFile(file: File): Promise<void> {
     if (!(await verifyAssets())) {
-      toast('얼굴 검출 모델을 불러올 수 없습니다. 페이지를 새로 고침해 주세요.');
+      toast(t('modelLoadFail'));
       return;
     }
 
-    const progress = openProgressModal('분석 중', () => this.client.cancel());
+    const progress = openProgressModal(t('analyzing'), () => this.client.cancel());
     let lastProgressAt = performance.now();
     const visHandler = (): void => {
       if (document.visibilityState === 'visible' && performance.now() - lastProgressAt > 15_000) {
-        toast('백그라운드에서 처리가 느려졌을 수 있습니다. 탭을 열어 둔 채 기다려 주세요.');
+        toast(t('bgSlow'));
       }
     };
     document.addEventListener('visibilitychange', visHandler);
@@ -195,17 +225,17 @@ class App {
       this.state.phase = 'review';
 
       if (project.source.durationUs > LONG_VIDEO_WARN_US) {
-        toast('5분이 넘는 영상입니다. 처리 시간이 길어질 수 있으니 구간을 나눠 작업하는 것을 권합니다.');
+        toast(t('longVideoWarn'));
       }
       this.renderReview();
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
-        toast('분석을 취소했습니다.');
+        toast(t('analysisCancelled'));
       } else {
         const msg = e instanceof Error ? e.message : String(e);
         openModal((modal, close) => {
           const h = document.createElement('h3');
-          h.textContent = '파일을 열 수 없습니다';
+          h.textContent = t('cannotOpen');
           const p = document.createElement('p');
           p.textContent = msg;
           p.style.whiteSpace = 'pre-wrap';
@@ -217,7 +247,7 @@ class App {
           actions.className = 'actions';
           const ok = document.createElement('button');
           ok.className = 'primary';
-          ok.textContent = '확인';
+          ok.textContent = t('ok');
           ok.addEventListener('click', close);
           actions.appendChild(ok);
           modal.appendChild(actions);
@@ -238,26 +268,29 @@ class App {
     this.root.innerHTML = '';
 
     // 상단
-    const topbar = buildTopbar(() => this.fileInput.click());
+    const topbar = buildTopbar(
+      () => this.fileInput.click(),
+      () => this.rerenderCurrent(),
+    );
 
     // 프로젝트 저장/불러오기
     const projBtns = document.createElement('div');
     projBtns.style.display = 'flex';
     projBtns.style.gap = '8px';
     const saveProj = document.createElement('button');
-    saveProj.textContent = '작업 내역 저장';
-    saveProj.title = '가림 박스·스타일 등 편집 내역만 저장합니다. 영상 파일은 포함되지 않습니다.';
+    saveProj.textContent = t('saveWork');
+    saveProj.title = t('saveWorkTip');
     saveProj.addEventListener('click', () => {
       void saveBlob(
         exportProjectJson(project, state.frames, file.size),
         `${file.name.replace(/\.[^.]+$/, '')}.scrim.json`,
         'application/json',
         '.json',
-      ).then((ok) => ok && toast('프로젝트를 저장했습니다'));
+      ).then((ok) => ok && toast(t('workSaved')));
     });
     const loadProj = document.createElement('button');
-    loadProj.textContent = '작업 내역 불러오기';
-    loadProj.title = '이 영상에서 저장했던 편집 내역(.json)을 불러옵니다.';
+    loadProj.textContent = t('loadWork');
+    loadProj.title = t('loadWorkTip');
     const projInput = document.createElement('input');
     projInput.type = 'file';
     projInput.accept = 'application/json,.json';
@@ -271,7 +304,7 @@ class App {
         durationUs: project.source.durationUs,
       });
       if (!result.ok || !result.project) {
-        toast(result.reason ?? '불러오기에 실패했습니다.');
+        toast(result.reason ?? t('loadFailed'));
         return;
       }
       state.pushUndo();
@@ -279,7 +312,7 @@ class App {
       project.globalStyle = result.project.globalStyle;
       state.manualSeq = maxManualSeq(project.tracks);
       state.emit('project');
-      toast('프로젝트를 불러왔습니다');
+      toast(t('workLoaded'));
     });
     loadProj.addEventListener('click', () => projInput.click());
     projBtns.append(saveProj, loadProj, projInput);
@@ -305,14 +338,14 @@ class App {
 
     const stepBack = document.createElement('button');
     stepBack.textContent = '◀';
-    stepBack.title = '이전 프레임 (←)';
+    stepBack.title = t('prevFrame');
     stepBack.addEventListener('click', () => player.stepFrame(-1));
     const playBtn = document.createElement('button');
-    playBtn.textContent = '재생';
+    playBtn.textContent = t('play');
     playBtn.addEventListener('click', () => player.togglePlay());
     const stepFwd = document.createElement('button');
     stepFwd.textContent = '▶';
-    stepFwd.title = '다음 프레임 (→)';
+    stepFwd.title = t('nextFrame');
     stepFwd.addEventListener('click', () => player.stepFrame(1));
 
     const time = document.createElement('span');
@@ -323,37 +356,37 @@ class App {
     updateTime();
     state.on('time', updateTime);
     state.on('playback', () => {
-      playBtn.textContent = state.playing ? '일시정지' : '재생';
+      playBtn.textContent = state.playing ? t('pause') : t('play');
     });
 
     const undoBtn = document.createElement('button');
-    undoBtn.textContent = '되돌리기';
+    undoBtn.textContent = t('undo');
     undoBtn.title = 'Cmd/Ctrl+Z';
     undoBtn.addEventListener('click', () => {
-      if (state.undo()) toast('되돌렸습니다');
-      else toast('되돌릴 작업이 없습니다');
+      if (state.undo()) toast(t('undone'));
+      else toast(t('nothingToUndo'));
     });
 
     const redoBtn = document.createElement('button');
-    redoBtn.textContent = '다시 실행';
+    redoBtn.textContent = t('redo');
     redoBtn.title = 'Cmd/Ctrl+Shift+Z';
     redoBtn.addEventListener('click', () => {
-      if (state.redo()) toast('다시 실행했습니다');
-      else toast('다시 실행할 작업이 없습니다');
+      if (state.redo()) toast(t('redone'));
+      else toast(t('nothingToRedo'));
     });
 
     const addBoxBtn = document.createElement('button');
-    addBoxBtn.textContent = '+ 박스';
-    addBoxBtn.title = '기존 가림 위에도 새 박스를 겹쳐 그립니다 (B)';
+    addBoxBtn.textContent = t('addBox');
+    addBoxBtn.title = t('addBoxTip');
     addBoxBtn.addEventListener('click', () => player.setAddBoxMode(!player.addBoxMode));
     player.onAddBoxModeChange = (on) => {
       addBoxBtn.classList.toggle('on', on);
-      if (on) toast('화면에서 드래그해 새 박스를 그리세요');
+      if (on) toast(t('addBoxHint'));
     };
 
     const cutBtn = document.createElement('button');
-    cutBtn.textContent = '컷 표시';
-    cutBtn.title = '현재 위치에 장면 경계 마커 추가/삭제 (C)';
+    cutBtn.textContent = t('cutMark');
+    cutBtn.title = t('cutTip');
     cutBtn.addEventListener('click', () => this.toggleCut());
 
     const spacer = document.createElement('span');
@@ -364,7 +397,7 @@ class App {
 
     const exportBtn = document.createElement('button');
     exportBtn.className = 'primary';
-    exportBtn.textContent = '내보내기';
+    exportBtn.textContent = t('export');
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
     // 내보내기는 상단바 우측, '영상·사진 열기' 오른쪽에 배치
@@ -385,10 +418,10 @@ class App {
     timeline.onHazardCountChange = (count) => {
       if (count > 0) {
         hazardCount.classList.remove('clear');
-        hazardCount.textContent = `미검증 구간 ${count}개`;
+        hazardCount.textContent = t('hazardCount', { n: count });
       } else {
         hazardCount.classList.add('clear');
-        hazardCount.textContent = '모든 구간 확인됨';
+        hazardCount.textContent = t('allVerified');
       }
     };
 
@@ -425,7 +458,7 @@ class App {
         player.stepFrame(1);
       } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
-        if (!timeline.jumpToNextHazard()) toast('미검증 구간이 없습니다');
+        if (!timeline.jumpToNextHazard()) toast(t('noHazard'));
       } else if ((e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         this.toggleCut();
@@ -445,17 +478,17 @@ class App {
           if (this.state.selectedTrackId && ids.has(this.state.selectedTrackId)) this.state.selectedTrackId = null;
           this.state.emit('selection');
           this.state.emit('project');
-          toast(`트랙 ${ids.size}개를 삭제했습니다`);
+          toast(t('deletedTracks', { n: ids.size }));
         }
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) {
         e.preventDefault();
-        if (this.state.redo()) toast('다시 실행했습니다');
+        if (this.state.redo()) toast(t('redone'));
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
-        if (this.state.undo()) toast('되돌렸습니다');
+        if (this.state.undo()) toast(t('undone'));
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
-        if (this.state.redo()) toast('다시 실행했습니다');
+        if (this.state.redo()) toast(t('redone'));
       }
     });
   }
@@ -468,17 +501,17 @@ class App {
     if (!frames || !project || frames.timestampsUs.length === 0) return;
     frames.cutsUs ??= [];
     const idx = nearestIndex(frames.timestampsUs, state.currentUs);
-    const t = frames.timestampsUs[idx];
-    if (t === undefined) return;
+    const ts = frames.timestampsUs[idx];
+    if (ts === undefined) return;
     const frameUs = project.source.durationUs / Math.max(1, project.source.frameCount);
-    const existing = frames.cutsUs.findIndex((c) => Math.abs(c - t) <= frameUs);
+    const existing = frames.cutsUs.findIndex((c) => Math.abs(c - ts) <= frameUs);
     if (existing >= 0) {
       frames.cutsUs.splice(existing, 1);
-      toast('컷 마커를 삭제했습니다');
+      toast(t('cutRemoved'));
     } else {
-      frames.cutsUs.push(t);
+      frames.cutsUs.push(ts);
       frames.cutsUs.sort((a, b) => a - b);
-      toast('컷 마커를 추가했습니다');
+      toast(t('cutAdded'));
     }
     state.emit('project');
   }
@@ -503,7 +536,7 @@ class App {
     };
 
     const options: { label: string; value: number | null }[] = [];
-    options.push({ label: `원본 — ${dims(null)}`, value: null });
+    options.push({ label: `${t('original')} — ${dims(null)}`, value: null });
     if (maxSide > 2560) options.push({ label: `1440p — ${dims(2560)}`, value: 2560 });
     if (maxSide > 1920) options.push({ label: `1080p — ${dims(1920)}`, value: 1920 });
     if (maxSide > 1280) options.push({ label: `720p — ${dims(1280)}`, value: 1280 });
@@ -513,9 +546,9 @@ class App {
 
     openModal((modal, close) => {
       const h = document.createElement('h3');
-      h.textContent = '내보내기';
+      h.textContent = t('export');
       const p = document.createElement('p');
-      p.textContent = '해상도';
+      p.textContent = t('resolution');
       const select = document.createElement('select');
       select.style.width = '100%';
       for (const opt of options) {
@@ -530,9 +563,7 @@ class App {
       const updateWarn = (): void => {
         const original = select.value === 'original';
         warn.textContent =
-          original && maxSide > 2160
-            ? '원본(4K) 그대로 내보내면 기기에 따라 시간이 오래 걸리거나 메모리 부족으로 실패할 수 있습니다.'
-            : '';
+          original && maxSide > 2160 ? t('warn4k') : '';
       };
       select.addEventListener('change', updateWarn);
       updateWarn();
@@ -540,11 +571,11 @@ class App {
       const actions = document.createElement('div');
       actions.className = 'actions';
       const cancel = document.createElement('button');
-      cancel.textContent = '취소';
+      cancel.textContent = t('cancel');
       cancel.addEventListener('click', close);
       const go = document.createElement('button');
       go.className = 'primary';
-      go.textContent = '내보내기';
+      go.textContent = t('export');
       go.addEventListener('click', () => {
         const value = select.value === 'original' ? null : Number(select.value);
         this.exportChoice = value;
@@ -582,9 +613,9 @@ class App {
       );
       const outName = `${file.name.replace(/\.[^.]+$/, '')}_scrim.${isPng ? 'png' : 'jpg'}`;
       const saved = await saveBlob(blob, outName, blob.type, isPng ? '.png' : '.jpg');
-      if (saved) toast('내보냈습니다');
+      if (saved) toast(t('exported'));
     } catch (e) {
-      toast(`내보내기 실패: ${e instanceof Error ? e.message : e}`);
+      toast(t('exportFailed', { msg: e instanceof Error ? e.message : String(e) }));
     }
   }
 
@@ -596,22 +627,22 @@ class App {
 
     this.rendering = true;
     state.phase = 'rendering';
-    const progress = openProgressModal('내보내는 중', () => this.client.cancel());
+    const progress = openProgressModal(t('exporting'), () => this.client.cancel());
     try {
       const blob = await this.client.render(file, project, maxLongSide, (p) => progress.update(p));
       progress.close();
       const outName = `${file.name.replace(/\.[^.]+$/, '')}_scrim.mp4`;
       const saved = await saveBlob(blob, outName, 'video/mp4', '.mp4');
-      if (saved) toast('내보냈습니다');
+      if (saved) toast(t('exported'));
     } catch (e) {
       progress.close();
       if (e instanceof DOMException && e.name === 'AbortError') {
-        toast('내보내기를 취소했습니다');
+        toast(t('exportCancelled'));
       } else {
         const msg = e instanceof Error ? e.message : String(e);
         openModal((modal, close) => {
           const h = document.createElement('h3');
-          h.textContent = '내보내기에 실패했습니다';
+          h.textContent = t('exportFailedTitle');
           const p = document.createElement('p');
           p.textContent = msg;
           p.style.whiteSpace = 'pre-wrap';
@@ -622,7 +653,7 @@ class App {
           actions.className = 'actions';
           const ok = document.createElement('button');
           ok.className = 'primary';
-          ok.textContent = '확인';
+          ok.textContent = t('ok');
           ok.addEventListener('click', close);
           actions.appendChild(ok);
           modal.append(h, p, actions);

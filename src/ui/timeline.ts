@@ -12,6 +12,7 @@
 import type { AppState } from './state';
 import { computeStrip, hazardSegments, nextHazard, nearestIndex, type StripData } from './frameState';
 import { trackColor } from './colors';
+import { t } from './i18n';
 
 const COLORS = {
   bg: '#1F1F26',
@@ -50,7 +51,7 @@ export class Timeline {
     this.stripCanvas.className = 'strip';
     const hint = document.createElement('div');
     hint.className = 'strip-hint';
-    hint.innerHTML = '<kbd>N</kbd> 다음 미검증 구간 · 사선 구간은 얼굴을 찾지 못한 프레임입니다';
+    hint.innerHTML = t('stripHint');
     this.root.append(this.timelineCanvas, this.stripCanvas, hint);
 
     state.on('project', () => {

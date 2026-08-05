@@ -11,6 +11,7 @@ import { sampleTrackAt } from '../core/track';
 import { redactFrame, scaleBox } from '../core/redact';
 import type { AppState } from './state';
 import { trackColor } from './colors';
+import { t } from './i18n';
 
 const HANDLE_PX = 10;
 const DEFAULT_MANUAL_DURATION_US = 1_000_000;
@@ -59,7 +60,7 @@ export class Player {
     // 터치 환경용 삭제 버튼 — 선택된 트랙의 박스 옆에 표시
     this.deleteBtn = document.createElement('button');
     this.deleteBtn.className = 'box-delete';
-    this.deleteBtn.textContent = '✕ 삭제';
+    this.deleteBtn.textContent = t('boxDelete');
     this.deleteBtn.style.display = 'none';
     this.deleteBtn.addEventListener('click', () => this.deleteSelected());
     this.root.append(this.video, this.imageEl, this.overlay, this.deleteBtn);
