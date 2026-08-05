@@ -326,7 +326,7 @@ canvas.strip {
   touch-action: none;
 }
 canvas.timeline {
-  height: 26px;
+  height: 34px;
   cursor: pointer;
 }
 canvas.strip {

@@ -10,6 +10,7 @@ import type { Box, RedactStyle, Track } from '../types';
 import { sampleTrackAt } from '../core/track';
 import { redactFrame, scaleBox } from '../core/redact';
 import type { AppState } from './state';
+import { trackColor } from './colors';
 
 const HANDLE_PX = 10;
 const DEFAULT_MANUAL_DURATION_US = 1_000_000;
@@ -209,31 +210,42 @@ export class Player {
       metaLike,
     );
 
-    // 선택된 트랙 외곽선 + 핸들 + 삭제 버튼
+    // 모든 박스에 트랙별 색 보더 — 같은 프레임의 여러 박스를 구분할 수 있게.
+    // 보더는 눈에 보이는 가림 영역(스타일 확대 적용)을 따라 그린다.
     const sel = this.state.selectedTrack();
+    for (const { box, style, track } of boxes) {
+      if (track.id === sel?.id) continue; // 선택 트랙은 아래에서 강조 표시
+      const vis = scaleBox(box, style.scale);
+      this.ctx.strokeStyle = trackColor(track.id);
+      this.ctx.lineWidth = 1.5;
+      this.ctx.setLineDash([6, 4]);
+      this.ctx.strokeRect(vis.x * W, vis.y * H, vis.w * W, vis.h * H);
+      this.ctx.setLineDash([]);
+    }
+
+    // 선택된 트랙: 굵은 실선 + 모서리 핸들 + 삭제 버튼
     this.deleteBtn.style.display = 'none';
     if (sel) {
       const box = sampleTrackAt(sel, this.state.currentUs);
       if (box) {
         this.positionDeleteButton(box);
+        const color = trackColor(sel.id);
         const x = box.x * W;
         const y = box.y * H;
         const w = box.w * W;
         const h = box.h * H;
-        this.ctx.strokeStyle = '#E8E6E1';
-        this.ctx.lineWidth = 1.5;
-        this.ctx.setLineDash([6, 4]);
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 3;
         this.ctx.strokeRect(x, y, w, h);
-        this.ctx.setLineDash([]);
         // 자동/수동 구분 없이 선택된 트랙은 편집 가능 — 모서리 핸들 표시
-        this.ctx.fillStyle = '#E8E6E1';
+        this.ctx.fillStyle = color;
         for (const [cx, cy] of [
           [x, y],
           [x + w, y],
           [x, y + h],
           [x + w, y + h],
         ] as const) {
-          this.ctx.fillRect(cx - 3, cy - 3, 6, 6);
+          this.ctx.fillRect(cx - 5, cy - 5, 10, 10);
         }
       }
     }

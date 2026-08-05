@@ -6,6 +6,7 @@
 import type { RedactStyle } from '../types';
 import type { AppState } from './state';
 import { shortTime } from './format';
+import { trackColor } from './colors';
 
 export class Sidebar {
   readonly root: HTMLElement;
@@ -61,6 +62,10 @@ export class Sidebar {
       const dot = document.createElement('span');
       dot.className = 'dot';
       dot.title = track.enabled ? '가림 켜짐 — 누르면 끕니다' : '가림 꺼짐 — 누르면 켭니다';
+      // 화면의 박스 보더 색과 동일한 색으로 트랙을 식별한다
+      const color = trackColor(track.id);
+      dot.style.borderColor = color;
+      if (track.enabled) dot.style.background = color;
       dot.addEventListener('click', (e) => {
         e.stopPropagation();
         this.state.pushUndo();

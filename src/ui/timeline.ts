@@ -11,6 +11,7 @@
  */
 import type { AppState } from './state';
 import { computeStrip, hazardSegments, nextHazard, nearestIndex, type StripData } from './frameState';
+import { trackColor } from './colors';
 
 const COLORS = {
   bg: '#1F1F26',
@@ -151,18 +152,28 @@ export class Timeline {
       ctx.fillStyle = COLORS.line;
     }
 
-    // 선택 트랙 구간 바 + 양끝 핸들
+    // 선택 트랙 구간 바 + 양끝 핸들 (트랙 색상, 드래그 중엔 확대·강조)
     const sel = this.state.selectedTrack();
     if (sel && sel.samples.length > 0) {
+      const color = trackColor(sel.id);
       const t0 = sel.samples[0]?.t ?? 0;
       const t1 = sel.samples[sel.samples.length - 1]?.t ?? 0;
       const x0 = (t0 / dur) * W;
       const x1 = (t1 / dur) * W;
-      ctx.fillStyle = COLORS.range;
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = color;
       ctx.fillRect(x0, H * 0.25, Math.max(2, x1 - x0), H * 0.5);
-      ctx.fillStyle = COLORS.manual;
-      ctx.fillRect(x0 - 2, H * 0.15, 4, H * 0.7);
-      ctx.fillRect(x1 - 2, H * 0.15, 4, H * 0.7);
+      ctx.globalAlpha = 1;
+      const drawHandle = (x: number, active: boolean): void => {
+        ctx.fillStyle = color;
+        if (active) {
+          ctx.fillRect(x - 5, 0, 10, H);
+        } else {
+          ctx.fillRect(x - 3, H * 0.1, 6, H * 0.8);
+        }
+      };
+      drawHandle(x0, this.draggingHandle === 'start');
+      drawHandle(x1, this.draggingHandle === 'end');
     }
 
     // 플레이헤드
@@ -279,14 +290,14 @@ export class Timeline {
           const x = e.clientX - rect.left;
           const x0 = ((sel.samples[0]?.t ?? 0) / dur) * rect.width;
           const x1 = ((sel.samples[sel.samples.length - 1]?.t ?? 0) / dur) * rect.width;
-          if (Math.abs(x - x0) < 6) {
+          // 터치 판정 넉넉하게 (14px). 두 핸들이 겹치면 가까운 쪽 우선
+          const HIT = 14;
+          const d0 = Math.abs(x - x0);
+          const d1 = Math.abs(x - x1);
+          if (Math.min(d0, d1) < HIT) {
             this.state.pushUndo();
-            this.draggingHandle = 'start';
-            return;
-          }
-          if (Math.abs(x - x1) < 6) {
-            this.state.pushUndo();
-            this.draggingHandle = 'end';
+            this.draggingHandle = d0 <= d1 ? 'start' : 'end';
+            this.draw();
             return;
           }
         }
@@ -309,7 +320,10 @@ export class Timeline {
 
     const up = (): void => {
       this.draggingSeek = false;
-      this.draggingHandle = null;
+      if (this.draggingHandle) {
+        this.draggingHandle = null;
+        this.draw();
+      }
     };
 
     for (const canvas of [this.timelineCanvas, this.stripCanvas]) {
