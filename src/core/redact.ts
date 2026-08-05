@@ -1,6 +1,6 @@
 /**
  * 레닥션 합성. 캔버스에는 이미 표시 방향으로 프레임이 그려져 있다고 가정하고,
- * 정규화 박스를 픽셀로 변환해 그 위에 모자이크/솔리드/블러를 얹는다.
+ * 정규화 박스를 픽셀로 변환해 그 위에 모자이크/블러/스티커를 얹는다.
  *
  * mosaic이 기본값이다. 가우시안 블러는 반경이 작으면 복원 공격이 가능하다 —
  * blur는 강도 하한을 강제한다 (MIN_BLUR_RADIUS + 박스 크기 비례 하한).
@@ -72,20 +72,6 @@ export function redactFrame(
     // 주의: ctx.filter는 iPad Safari가 지원하지 않는다 — 블러/페더 모두 filter 없이 구현한다.
     const src = source ?? (ctx.canvas as OffscreenCanvas);
     switch (style.kind) {
-      case 'mosaic': {
-        // 다운스케일 왕복: 축소(평균화) 후 smoothing 없이 확대
-        const cell = Math.max(3, Math.round(short * style.strength));
-        const sw = Math.max(1, Math.ceil(w / cell));
-        const sh = Math.max(1, Math.ceil(h / cell));
-        const cctx = ensureCell(sw, sh);
-        cctx.imageSmoothingEnabled = true;
-        cctx.clearRect(0, 0, sw, sh);
-        cctx.drawImage(src, x, y, w, h, 0, 0, sw, sh);
-        work.imageSmoothingEnabled = false;
-        work.drawImage(cellCanvas!, 0, 0, sw, sh, 0, 0, w, h);
-        work.imageSmoothingEnabled = true;
-        break;
-      }
       case 'blur': {
         // 복원 공격 방지: 반경 하한 강제.
         // 다운스케일 왕복 2회(스무딩 켠 채)로 근사 가우시안 — filter 미지원 브라우저 공통 동작.
@@ -105,15 +91,25 @@ export function redactFrame(
         work.drawImage(cellCanvas!, 0, 0, bw, bh, 0, 0, w, h);
         break;
       }
-      case 'solid': {
-        work.fillStyle = '#000000';
-        work.fillRect(0, 0, w, h);
-        break;
-      }
       case 'sticker': {
         // 이모지만으로는 얼굴이 다 가려지지 않을 수 있다 — 모자이크 바탕을 깔고
         // 이모지/문구는 마스크 적용 후에 얹는다 (아래 별도 처리)
         const cell = Math.max(3, Math.round(short * 0.12));
+        const sw = Math.max(1, Math.ceil(w / cell));
+        const sh = Math.max(1, Math.ceil(h / cell));
+        const cctx = ensureCell(sw, sh);
+        cctx.imageSmoothingEnabled = true;
+        cctx.clearRect(0, 0, sw, sh);
+        cctx.drawImage(src, x, y, w, h, 0, 0, sw, sh);
+        work.imageSmoothingEnabled = false;
+        work.drawImage(cellCanvas!, 0, 0, sw, sh, 0, 0, w, h);
+        work.imageSmoothingEnabled = true;
+        break;
+      }
+      default: {
+        // 모자이크 — 기본값. 알 수 없는 kind(구버전 'solid' 등)도 안전하게 모자이크 처리.
+        // 다운스케일 왕복: 축소(평균화) 후 smoothing 없이 확대
+        const cell = Math.max(3, Math.round(short * style.strength));
         const sw = Math.max(1, Math.ceil(w / cell));
         const sh = Math.max(1, Math.ceil(h / cell));
         const cctx = ensureCell(sw, sh);

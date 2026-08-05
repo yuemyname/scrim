@@ -50,6 +50,12 @@ export function parseProjectFile(text: string): ProjectParseResult {
   if (p?.version !== 1 || !p.source || !Array.isArray(p.tracks)) {
     return { ok: false, reason: '프로젝트 파일 형식이 아닙니다.' };
   }
+  // 구버전 호환: 제거된 'solid'는 모자이크로 변환
+  const normalize = (st: { kind: string } | null | undefined): void => {
+    if (st && st.kind === 'solid') st.kind = 'mosaic';
+  };
+  normalize(p.globalStyle);
+  for (const t of p.tracks) normalize(t.style);
   return { ok: true, saved: p };
 }
 

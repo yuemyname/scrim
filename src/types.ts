@@ -25,11 +25,11 @@ export interface TrackSample {
 }
 
 export type ShapeKind = 'ellipse' | 'rect';
-export type RedactKind = 'mosaic' | 'solid' | 'blur' | 'sticker';
+export type RedactKind = 'mosaic' | 'blur' | 'sticker';
 
 export interface RedactStyle {
   kind: RedactKind;
-  /** mosaic: 셀 크기(박스 대비 비율). blur: 반경. solid: 무시 */
+  /** mosaic: 셀 크기(박스 대비 비율). blur: 반경 */
   strength: number;
   shape: ShapeKind;
   /** 경계 페더 (0..1, 박스 짧은 변 대비) */

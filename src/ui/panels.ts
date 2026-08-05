@@ -221,7 +221,6 @@ export class Sidebar {
     seg.className = 'seg';
     const kinds: { k: RedactStyle['kind']; label: string; title?: string }[] = [
       { k: 'mosaic', label: '모자이크' },
-      { k: 'solid', label: '솔리드' },
       { k: 'blur', label: '블러', title: '블러는 반경이 작으면 복원될 수 있어 최소 강도가 강제됩니다' },
       { k: 'sticker', label: '스티커', title: '모자이크 바탕 위에 이모지/문구를 얹습니다' },
     ];
