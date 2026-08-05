@@ -28,6 +28,8 @@ export class AppState {
   currentUs = 0;
   playing = false;
   selectedTrackId: string | null = null;
+  /** 일괄 수정용 다중 선택 (체크박스) */
+  checkedIds = new Set<string>();
   manualSeq = 0;
 
   private undoStack: Snapshot[] = [];
@@ -88,6 +90,18 @@ export class AppState {
   selectedTrack(): Track | null {
     if (!this.project || !this.selectedTrackId) return null;
     return this.project.tracks.find((t) => t.id === this.selectedTrackId) ?? null;
+  }
+
+  /** 체크된 트랙들 (삭제된 ID는 자동 제외) */
+  checkedTracks(): Track[] {
+    if (!this.project) return [];
+    return this.project.tracks.filter((t) => this.checkedIds.has(t.id));
+  }
+
+  toggleChecked(id: string): void {
+    if (this.checkedIds.has(id)) this.checkedIds.delete(id);
+    else this.checkedIds.add(id);
+    this.emit('selection');
   }
 
   setTime(us: number): void {

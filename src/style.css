@@ -178,7 +178,7 @@ select {
   border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
 .sidebar h2 {
   font-size: 11px;
@@ -187,8 +187,34 @@ select {
   color: var(--ink-muted);
   padding: 14px 14px 8px;
 }
+/* 트랙이 많아지면 목록만 스크롤 — STYLE 패널은 항상 보인다 */
 .track-list {
   list-style: none;
+  flex: 1 1 auto;
+  min-height: 80px;
+  overflow-y: auto;
+}
+.track-list li .track-check {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--ink);
+}
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px 8px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.batch-bar:empty {
+  display: none;
+}
+.batch-bar button {
+  padding: 3px 10px;
+  font-size: 12px;
 }
 .track-list li {
   display: flex;
@@ -247,6 +273,9 @@ select {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: none;
+  overflow-y: auto;
+  max-height: 55%;
 }
 .style-panel .row {
   display: flex;

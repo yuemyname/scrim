@@ -552,16 +552,19 @@ class App {
         e.preventDefault();
         player.setAddBoxMode(!player.addBoxMode);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        const sel = this.state.selectedTrack();
         const project = this.state.project;
-        if (sel && project) {
+        const checked = this.state.checkedTracks();
+        const sel = this.state.selectedTrack();
+        if (project && (checked.length > 0 || sel)) {
           e.preventDefault();
           this.state.pushUndo();
-          project.tracks = project.tracks.filter((t) => t.id !== sel.id);
-          this.state.selectedTrackId = null;
+          const ids = new Set(checked.length > 0 ? checked.map((t) => t.id) : [sel!.id]);
+          project.tracks = project.tracks.filter((t) => !ids.has(t.id));
+          this.state.checkedIds.clear();
+          if (this.state.selectedTrackId && ids.has(this.state.selectedTrackId)) this.state.selectedTrackId = null;
           this.state.emit('selection');
           this.state.emit('project');
-          toast(`${sel.id} 트랙을 삭제했습니다`);
+          toast(`트랙 ${ids.size}개를 삭제했습니다`);
         }
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) {
         e.preventDefault();
