@@ -133,6 +133,67 @@ export async function analyze(
   return { project, frames };
 }
 
+/** 사진(단일 프레임) 분석. 데믹스·디코드 없이 검출 한 번으로 끝난다. */
+export async function analyzeImage(
+  file: File,
+  opts: AnalyzeOptions,
+): Promise<{ project: Project; frames: FrameIndex }> {
+  // EXIF 회전을 반영해 표시 방향으로 디코드
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch((e) => {
+    throw stageError('사진 읽기', e);
+  });
+
+  const meta = {
+    fileName: file.name,
+    width: bitmap.width,
+    height: bitmap.height,
+    durationUs: 1_000_000, // 단일 프레임의 명목 길이 (수동 박스 구간용)
+    frameCount: 1,
+    rotation: 0,
+    codec: 'image',
+    hasAudio: false,
+  };
+
+  const detector = await createDetector({
+    minConfidence: opts.minConfidence ?? 0.35,
+    displayWidth: meta.width,
+    displayHeight: meta.height,
+    rotation: 0,
+  }).catch((e) => {
+    throw new Error(`얼굴 검출기 초기화 실패: ${e instanceof Error ? e.message : e}`);
+  });
+
+  try {
+    const vf = new VideoFrame(bitmap, { timestamp: 0 });
+    const { detections } = await detector.detect(vf, 0).catch(rethrowWithStage('사진 분석'));
+    vf.close();
+
+    const tracks: Track[] = detections.map((d, i) => ({
+      id: `A${i + 1}`,
+      samples: [
+        { t: 0, box: d.box, source: 'detected' as const },
+        { t: meta.durationUs, box: d.box, source: 'detected' as const },
+      ],
+      enabled: true,
+      style: null,
+      origin: 'auto' as const,
+      avgScore: d.score,
+    }));
+
+    const frames: FrameIndex = {
+      timestampsUs: [0],
+      detectionCounts: [detections.length],
+      discardedShortAt: [],
+      cutsUs: [],
+    };
+
+    return { project: { version: 1, source: meta, tracks, globalStyle: { ...DEFAULT_STYLE } }, frames };
+  } finally {
+    bitmap.close();
+    detector.close();
+  }
+}
+
 export async function render(
   file: File,
   project: Project,

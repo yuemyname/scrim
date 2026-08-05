@@ -22,6 +22,8 @@ interface Snapshot {
 export class AppState {
   phase: AppPhase = 'landing';
   file: File | null = null;
+  /** 사진 모드 (단일 프레임) */
+  isImage = false;
   project: Project | null = null;
   frames: FrameIndex | null = null;
   /** 현재 재생 위치 (마이크로초) */

@@ -4,30 +4,9 @@
  */
 import type { FrameIndex, Project } from '../types';
 
-interface SaveFilePickerWindow {
-  showSaveFilePicker?: (opts: {
-    suggestedName?: string;
-    types?: { description: string; accept: Record<string, string[]> }[];
-  }) => Promise<{ createWritable(): Promise<{ write(b: Blob): Promise<void>; close(): Promise<void> }> }>;
-}
-
-export async function saveBlob(blob: Blob, suggestedName: string, mime: string, ext: string): Promise<boolean> {
-  const w = window as unknown as SaveFilePickerWindow;
-  if (w.showSaveFilePicker) {
-    try {
-      const handle = await w.showSaveFilePicker({
-        suggestedName,
-        types: [{ description: suggestedName, accept: { [mime]: [ext] } }],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return false;
-      // 피커 실패 → 폴백으로 계속
-    }
-  }
+export async function saveBlob(blob: Blob, suggestedName: string, _mime: string, _ext: string): Promise<boolean> {
+  // showSaveFilePicker는 브라우저별 동작 편차가 커서(iPad 미지원, 제스처 제약)
+  // 모든 환경에서 동일하게 동작하는 a[download]로 통일한다.
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

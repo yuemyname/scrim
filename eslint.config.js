@@ -12,7 +12,7 @@ export default tseslint.config(
     plugins: { scrim: scrimPlugin },
     rules: {
       'scrim/no-network': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }],
     },
   },
   {

@@ -71,6 +71,18 @@ export class PipelineClient {
     });
   }
 
+  analyzeImage(
+    file: File,
+    minConfidence: number,
+    onProgress?: (p: Progress) => void,
+  ): Promise<{ project: Project; frames: FrameIndex }> {
+    const jobId = ++this.jobSeq;
+    return new Promise((resolve, reject) => {
+      this.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject, onProgress });
+      this.send({ type: 'analyzeImage', jobId, file, minConfidence });
+    });
+  }
+
   render(
     file: File,
     project: Project,

@@ -14,6 +14,8 @@ import { toast } from './ui/toast';
 import { timecode } from './ui/format';
 import { nearestIndex } from './ui/frameState';
 import { verifyAssets } from './core/assets';
+import { sampleTrackAt } from './core/track';
+import { redactFrame } from './core/redact';
 
 const app = document.getElementById('app');
 if (!app) throw new Error('#app not found');
@@ -94,7 +96,7 @@ class App {
     this.root = root;
     this.fileInput = document.createElement('input');
     this.fileInput.type = 'file';
-    this.fileInput.accept = 'video/mp4,video/quicktime,.mp4,.mov';
+    this.fileInput.accept = 'video/mp4,video/quicktime,image/*,.mp4,.mov,.jpg,.jpeg,.png,.webp,.heic,.heif';
     this.fileInput.style.display = 'none';
     this.fileInput.addEventListener('change', () => {
       const f = this.fileInput.files?.[0];
@@ -121,7 +123,7 @@ class App {
 
     const drop = document.createElement('div');
     drop.className = 'dropzone';
-    drop.innerHTML = '영상을 끌어다 놓으세요.<br />파일은 이 브라우저를 벗어나지 않습니다.';
+    drop.innerHTML = '영상이나 사진을 끌어다 놓으세요.<br />파일은 이 브라우저를 벗어나지 않습니다.';
     drop.addEventListener('click', () => this.fileInput.click());
     drop.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -175,10 +177,17 @@ class App {
     document.addEventListener('visibilitychange', visHandler);
 
     try {
-      const { project, frames } = await this.client.analyze(file, this.minConfidence, (p) => {
-        lastProgressAt = performance.now();
-        progress.update(p);
-      });
+      const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+      const { project, frames } = isImage
+        ? await this.client.analyzeImage(file, this.minConfidence, (p) => {
+            lastProgressAt = performance.now();
+            progress.update(p);
+          })
+        : await this.client.analyze(file, this.minConfidence, (p) => {
+            lastProgressAt = performance.now();
+            progress.update(p);
+          });
+      this.state.isImage = isImage;
       this.state.file = file;
       this.state.project = project;
       this.state.frames = frames;
@@ -196,7 +205,7 @@ class App {
         const msg = e instanceof Error ? e.message : String(e);
         openModal((modal, close) => {
           const h = document.createElement('h3');
-          h.textContent = '영상을 열 수 없습니다';
+          h.textContent = '파일을 열 수 없습니다';
           const p = document.createElement('p');
           p.textContent = msg;
           p.style.whiteSpace = 'pre-wrap';
@@ -358,7 +367,11 @@ class App {
     exportBtn.textContent = '내보내기';
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
-    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, cutBtn, spacer, hazardCount, exportBtn);
+    if (state.isImage) {
+      transport.append(undoBtn, redoBtn, addBoxBtn, spacer, hazardCount, exportBtn);
+    } else {
+      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, cutBtn, spacer, hazardCount, exportBtn);
+    }
 
     const timeline = new Timeline(state);
     timeline.onHazardCountChange = (count) => {
@@ -371,19 +384,13 @@ class App {
       }
     };
 
-    bottombar.append(transport, timeline.root);
-
-    // 오디오 경고 배너
-    if (!project.source.hasAudio) {
-      const banner = document.createElement('div');
-      banner.className = 'warn-banner';
-      banner.textContent = '오디오가 없거나 형식이 지원되지 않아 영상만 내보내집니다.';
-      bottombar.prepend(banner);
-    }
+    bottombar.append(transport);
+    if (!state.isImage) bottombar.append(timeline.root);
 
     this.root.append(topbar, workspace, bottombar, buildPrivacyFooter());
 
-    player.load(file);
+    if (state.isImage) player.loadImage(file);
+    else player.load(file);
     timeline.draw();
     state.emit('project');
 
@@ -474,6 +481,10 @@ class App {
   private exportVideo(): void {
     const project = this.state.project;
     if (!project || this.rendering) return;
+    if (this.state.isImage) {
+      void this.exportImage();
+      return;
+    }
     const { width, height } = project.source;
     const maxSide = Math.max(width, height);
 
@@ -535,6 +546,38 @@ class App {
       actions.append(cancel, go);
       modal.append(h, p, select, warn, actions);
     });
+  }
+
+  /** 사진 내보내기 — 단일 프레임이라 메인 스레드에서 즉시 처리한다 */
+  private async exportImage(): Promise<void> {
+    const state = this.state;
+    const project = state.project;
+    const file = state.file;
+    if (!project || !file) return;
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const boxes = [];
+      for (const track of project.tracks) {
+        if (!track.enabled) continue;
+        const box = sampleTrackAt(track, 0);
+        if (box) boxes.push({ box, style: track.style ?? project.globalStyle });
+      }
+      const meta = { ...project.source, width: canvas.width, height: canvas.height };
+      if (boxes.length > 0) redactFrame(ctx, null, boxes, meta);
+      const isPng = file.type === 'image/png' || /\.png$/i.test(file.name);
+      const blob = await canvas.convertToBlob(
+        isPng ? { type: 'image/png' } : { type: 'image/jpeg', quality: 0.92 },
+      );
+      const outName = `${file.name.replace(/\.[^.]+$/, '')}_scrim.${isPng ? 'png' : 'jpg'}`;
+      const saved = await saveBlob(blob, outName, blob.type, isPng ? '.png' : '.jpg');
+      if (saved) toast('내보냈습니다');
+    } catch (e) {
+      toast(`내보내기 실패: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   private async runRender(maxLongSide: number | null): Promise<void> {

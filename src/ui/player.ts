@@ -23,6 +23,8 @@ type DragMode =
 export class Player {
   readonly root: HTMLElement;
   readonly video: HTMLVideoElement;
+  private imageEl: HTMLImageElement;
+  private imageMode = false;
   private overlay: HTMLCanvasElement;
   private deleteBtn: HTMLButtonElement;
   private ctx: CanvasRenderingContext2D;
@@ -47,6 +49,11 @@ export class Player {
     this.video.muted = false;
     this.video.playsInline = true;
     this.video.preload = 'auto';
+    this.imageEl = document.createElement('img');
+    this.imageEl.style.display = 'none';
+    this.imageEl.style.width = '100%';
+    this.imageEl.style.height = '100%';
+    this.imageEl.style.pointerEvents = 'none';
     this.overlay = document.createElement('canvas');
     this.overlay.className = 'overlay';
     // 터치 환경용 삭제 버튼 — 선택된 트랙의 박스 옆에 표시
@@ -55,7 +62,7 @@ export class Player {
     this.deleteBtn.textContent = '✕ 삭제';
     this.deleteBtn.style.display = 'none';
     this.deleteBtn.addEventListener('click', () => this.deleteSelected());
-    this.root.append(this.video, this.overlay, this.deleteBtn);
+    this.root.append(this.video, this.imageEl, this.overlay, this.deleteBtn);
     const ctx = this.overlay.getContext('2d');
     if (!ctx) throw new Error('overlay 2d context');
     this.ctx = ctx;
@@ -133,6 +140,31 @@ export class Player {
     this.root.style.height = `${Math.max(1, Math.floor(vh * scale))}px`;
   }
 
+  /** 사진 모드: 비디오 대신 이미지를 표시하고 단일 프레임으로 동작한다 */
+  loadImage(file: File): void {
+    this.imageMode = true;
+    if (this.videoUrl) URL.revokeObjectURL(this.videoUrl);
+    this.videoUrl = URL.createObjectURL(file);
+    this.video.style.display = 'none';
+    this.imageEl.style.display = 'block';
+    this.imageEl.src = this.videoUrl;
+    this.imageEl.addEventListener(
+      'load',
+      () => {
+        this.overlay.width = this.imageEl.naturalWidth;
+        this.overlay.height = this.imageEl.naturalHeight;
+        this.fitToStage();
+        this.requestDraw();
+      },
+      { once: true },
+    );
+    const stage = this.root.parentElement;
+    if (stage && !this.stageObserver) {
+      this.stageObserver = new ResizeObserver(() => this.fitToStage());
+      this.stageObserver.observe(stage);
+    }
+  }
+
   /** 무거운 인코딩 뒤 Safari가 비디오 디코더를 회수하면 시킹이 멈춘다 —
    *  소스를 다시 로드해 디코더를 재확보하고 위치를 복원한다. */
   refresh(): void {
@@ -151,11 +183,13 @@ export class Player {
   }
 
   togglePlay(): void {
+    if (this.imageMode) return;
     if (this.video.paused) void this.video.play();
     else this.video.pause();
   }
 
   stepFrame(dir: 1 | -1): void {
+    if (this.imageMode) return;
     this.video.pause();
     const meta = this.state.project?.source;
     const frameUs = meta && meta.frameCount > 0 ? meta.durationUs / meta.frameCount : 33_366;
@@ -198,14 +232,21 @@ export class Player {
     const W = this.overlay.width;
     const H = this.overlay.height;
     this.ctx.clearRect(0, 0, W, H);
-    if (this.video.readyState < 2) return;
+    const source: CanvasImageSource | null = this.imageMode
+      ? this.imageEl.complete && this.imageEl.naturalWidth > 0
+        ? this.imageEl
+        : null
+      : this.video.readyState >= 2
+        ? this.video
+        : null;
+    if (!source) return;
 
     const boxes = this.activeBoxes();
-    // 미리보기 합성: 비디오 요소를 소스로 영역만 처리해 오버레이에 얹는다
+    // 미리보기 합성: 원본 요소를 소스로 영역만 처리해 오버레이에 얹는다
     const metaLike = { ...project.source, width: W, height: H };
     redactFrame(
       this.ctx,
-      this.video,
+      source,
       boxes.map(({ box, style }) => ({ box, style })),
       metaLike,
     );

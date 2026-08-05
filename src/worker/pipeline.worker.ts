@@ -2,7 +2,7 @@
  * 분석/렌더 전용 Worker. UI 스레드 블로킹 방지.
  * AbortSignal로 취소 가능 — 10분짜리 렌더를 멈출 수 없으면 못 쓰는 도구다.
  */
-import { analyze, render } from '../core/pipeline';
+import { analyze, analyzeImage, render } from '../core/pipeline';
 import { UnsupportedSourceError } from '../core/demux';
 import type { WorkerRequest, WorkerResponse } from './protocol';
 
@@ -32,6 +32,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         (p) => post({ type: 'progress', jobId, progress: p }),
         signal,
       );
+      post({ type: 'analyzed', jobId, project: result.project, frames: result.frames });
+    } else if (msg.type === 'analyzeImage') {
+      const result = await analyzeImage(msg.file, { minConfidence: msg.minConfidence });
       post({ type: 'analyzed', jobId, project: result.project, frames: result.frames });
     } else if (msg.type === 'render') {
       const blob = await render(
