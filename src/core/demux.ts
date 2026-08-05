@@ -282,6 +282,20 @@ function rotationFromMatrix(matrix: Int32Array | number[] | undefined): number {
   return 0;
 }
 
+/** esds 디스크립터 트리에서 tag를 재귀 탐색 (구조가 파일마다 다르다) */
+function findDescriptorData(node: unknown, tag: number): Uint8Array | null {
+  if (!node || typeof node !== 'object') return null;
+  const n = node as { tag?: number; data?: Uint8Array; descs?: unknown[] };
+  if (n.tag === tag && n.data && n.data.length > 0) return n.data;
+  for (const child of n.descs ?? []) {
+    const r = findDescriptorData(child, tag);
+    if (r) return r;
+  }
+  return null;
+}
+
+const AAC_SAMPLE_RATES = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
+
 function buildAudioPassthrough(
   mp4: MP4File,
   track: MP4MediaTrack,
@@ -291,11 +305,18 @@ function buildAudioPassthrough(
   // AAC(mp4a.40.x)만 패스스루. 그 외 코덱은 remux 불가 → null 폴백 (UI에서 경고)
   if (!track.codec.toLowerCase().startsWith('mp4a')) return null;
 
+  const sampleRate = track.audio?.sample_rate ?? 48000;
+  const channels = track.audio?.channel_count ?? 2;
+
   const entry = findEntry(mp4, track.id, (e) => Boolean(e.esds));
-  const decoderConfig = entry?.esds?.esd?.descs?.find((d) => d.tag === 4);
-  const specificInfo = decoderConfig?.descs?.find((d) => d.tag === 5);
-  const description = specificInfo?.data;
-  if (!description || description.length === 0) return null;
+  let description = findDescriptorData(entry?.esds?.esd, 5);
+  if (!description) {
+    // esds에서 AudioSpecificConfig를 못 찾음 → 트랙 정보로 합성 (AAC-LC 가정)
+    const fi = AAC_SAMPLE_RATES.indexOf(sampleRate);
+    if (fi < 0) return null;
+    const cfg = (2 << 11) | (fi << 7) | (channels << 3);
+    description = new Uint8Array([(cfg >> 8) & 0xff, cfg & 0xff]);
+  }
 
   const chunks: AudioSample[] = samples.map((s) => ({
     data: s.data,

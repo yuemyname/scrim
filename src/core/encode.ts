@@ -32,21 +32,31 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
   const height = opts.height - (opts.height % 2);
 
   const candidates = Math.max(width, height) > 1920 ? [...CODEC_HIGH_RES, ...CODEC_FALLBACKS] : CODEC_FALLBACKS;
-  let codec: string | null = null;
-  for (const candidate of candidates) {
-    const support = await VideoEncoder.isConfigSupported({
-      codec: candidate,
-      width,
-      height,
-      bitrate: opts.bitrate,
-      framerate: opts.fps,
-    });
-    if (support.supported) {
-      codec = candidate;
-      break;
+  // 일부 브라우저는 latencyMode/hardwareAcceleration 조합 자체를 거부한다 → 옵션을 줄여가며 시도
+  const extrasChain: Partial<VideoEncoderConfig>[] = [
+    { latencyMode: 'quality', hardwareAcceleration: 'prefer-hardware' },
+    { latencyMode: 'quality' },
+    {},
+  ];
+  let config: VideoEncoderConfig | null = null;
+  outer: for (const candidate of candidates) {
+    for (const extras of extrasChain) {
+      const attempt: VideoEncoderConfig = {
+        codec: candidate,
+        width,
+        height,
+        bitrate: opts.bitrate,
+        framerate: opts.fps,
+        ...extras,
+      };
+      const support = await VideoEncoder.isConfigSupported(attempt).catch(() => null);
+      if (support?.supported) {
+        config = attempt;
+        break outer;
+      }
     }
   }
-  if (!codec) throw new Error('이 브라우저에서 H.264 인코딩을 지원하지 않습니다.');
+  if (!config) throw new Error('이 브라우저에서 H.264 인코딩을 지원하지 않습니다.');
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
@@ -68,15 +78,7 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
     error: (e) => (error = e instanceof Error ? e : new Error(String(e))),
   });
-  encoder.configure({
-    codec,
-    width,
-    height,
-    bitrate: opts.bitrate,
-    framerate: opts.fps,
-    latencyMode: 'quality',
-    hardwareAcceleration: 'prefer-hardware',
-  });
+  encoder.configure(config);
 
   let lastKeyUs = -Infinity;
 

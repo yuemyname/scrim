@@ -476,7 +476,25 @@ class App {
       if (e instanceof DOMException && e.name === 'AbortError') {
         toast('내보내기를 취소했습니다');
       } else {
-        toast(`내보내기 실패: ${e instanceof Error ? e.message : e}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        openModal((modal, close) => {
+          const h = document.createElement('h3');
+          h.textContent = '내보내기에 실패했습니다';
+          const p = document.createElement('p');
+          p.textContent = msg;
+          p.style.whiteSpace = 'pre-wrap';
+          p.style.wordBreak = 'break-all';
+          p.className = 'mono';
+          p.style.fontSize = '11px';
+          const actions = document.createElement('div');
+          actions.className = 'actions';
+          const ok = document.createElement('button');
+          ok.className = 'primary';
+          ok.textContent = '확인';
+          ok.addEventListener('click', close);
+          actions.appendChild(ok);
+          modal.append(h, p, actions);
+        });
       }
     } finally {
       this.rendering = false;

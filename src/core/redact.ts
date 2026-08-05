@@ -39,6 +39,18 @@ function getScratch(w: number, h: number): {
   return { work: workCtx, mask: maskCtx! };
 }
 
+function ensureCell(w: number, h: number): OffscreenCanvasRenderingContext2D {
+  if (!cellCanvas || !cellCtx) {
+    cellCanvas = new OffscreenCanvas(w, h);
+    cellCtx = cellCanvas.getContext('2d')!;
+  }
+  if (cellCanvas.width < w || cellCanvas.height < h) {
+    cellCanvas.width = Math.max(cellCanvas.width, w);
+    cellCanvas.height = Math.max(cellCanvas.height, h);
+  }
+  return cellCtx;
+}
+
 export function redactFrame(
   ctx: Ctx2D,
   source: CanvasImageSource | null,
@@ -57,6 +69,7 @@ export function redactFrame(
     const { work, mask } = getScratch(w, h);
 
     // 1) 소스 영역을 work 캔버스로 가져와 스타일 적용
+    // 주의: ctx.filter는 iPad Safari가 지원하지 않는다 — 블러/페더 모두 filter 없이 구현한다.
     const src = source ?? (ctx.canvas as OffscreenCanvas);
     switch (style.kind) {
       case 'mosaic': {
@@ -64,29 +77,32 @@ export function redactFrame(
         const cell = Math.max(3, Math.round(short * style.strength));
         const sw = Math.max(1, Math.ceil(w / cell));
         const sh = Math.max(1, Math.ceil(h / cell));
-        if (!cellCanvas || !cellCtx) {
-          cellCanvas = new OffscreenCanvas(sw, sh);
-          cellCtx = cellCanvas.getContext('2d')!;
-        }
-        if (cellCanvas.width < sw || cellCanvas.height < sh) {
-          cellCanvas.width = Math.max(cellCanvas.width, sw);
-          cellCanvas.height = Math.max(cellCanvas.height, sh);
-        }
-        cellCtx.imageSmoothingEnabled = true;
-        cellCtx.clearRect(0, 0, sw, sh);
-        cellCtx.drawImage(src, x, y, w, h, 0, 0, sw, sh);
+        const cctx = ensureCell(sw, sh);
+        cctx.imageSmoothingEnabled = true;
+        cctx.clearRect(0, 0, sw, sh);
+        cctx.drawImage(src, x, y, w, h, 0, 0, sw, sh);
         work.imageSmoothingEnabled = false;
-        work.drawImage(cellCanvas, 0, 0, sw, sh, 0, 0, w, h);
+        work.drawImage(cellCanvas!, 0, 0, sw, sh, 0, 0, w, h);
         work.imageSmoothingEnabled = true;
         break;
       }
       case 'blur': {
-        // 복원 공격 방지: 반경 하한 강제
+        // 복원 공격 방지: 반경 하한 강제.
+        // 다운스케일 왕복 2회(스무딩 켠 채)로 근사 가우시안 — filter 미지원 브라우저 공통 동작.
         const radius = Math.max(MIN_BLUR_RADIUS, short * 0.08, style.strength);
-        work.filter = `blur(${radius}px)`;
-        // 블러 가장자리 번짐을 줄이기 위해 살짝 넓게 그린다
-        work.drawImage(src, x - radius, y - radius, w + radius * 2, h + radius * 2, -radius, -radius, w + radius * 2, h + radius * 2);
-        work.filter = 'none';
+        const s = Math.max(3, radius / 2);
+        const bw = Math.max(1, Math.round(w / s));
+        const bh = Math.max(1, Math.round(h / s));
+        const cctx = ensureCell(bw, bh);
+        cctx.imageSmoothingEnabled = true;
+        work.imageSmoothingEnabled = true;
+        cctx.clearRect(0, 0, bw, bh);
+        cctx.drawImage(src, x, y, w, h, 0, 0, bw, bh);
+        work.drawImage(cellCanvas!, 0, 0, bw, bh, 0, 0, w, h);
+        cctx.clearRect(0, 0, bw, bh);
+        cctx.drawImage(workCanvas!, 0, 0, w, h, 0, 0, bw, bh);
+        work.clearRect(0, 0, w, h);
+        work.drawImage(cellCanvas!, 0, 0, bw, bh, 0, 0, w, h);
         break;
       }
       case 'solid': {
@@ -99,13 +115,14 @@ export function redactFrame(
     // 2) 모양 + 페더 알파 마스크를 destination-in으로 적용
     const featherPx = Math.max(0, Math.min(1, style.feather)) * (short / 2);
     mask.save();
+    mask.fillStyle = '#000';
     if (style.shape === 'ellipse') {
       if (featherPx > 0.5) {
-        const g = mask.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, 1);
-        // 반경 1 기준 그라디언트를 타원으로 스케일
+        // 그라디언트는 변환된 좌표계 기준 — 중심 (0,0), 반경 1
         mask.translate(w / 2, h / 2);
         mask.scale(w / 2, h / 2);
-        const inner = Math.max(0, 1 - (featherPx / (short / 2)));
+        const inner = Math.min(0.999, Math.max(0, 1 - featherPx / (short / 2)));
+        const g = mask.createRadialGradient(0, 0, 0, 0, 0, 1);
         g.addColorStop(0, 'rgba(0,0,0,1)');
         g.addColorStop(inner, 'rgba(0,0,0,1)');
         g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -114,17 +131,22 @@ export function redactFrame(
         mask.arc(0, 0, 1, 0, Math.PI * 2);
         mask.fill();
       } else {
-        mask.fillStyle = '#000';
         mask.beginPath();
         mask.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
         mask.fill();
       }
     } else {
-      mask.fillStyle = '#000';
       if (featherPx > 0.5) {
-        mask.filter = `blur(${featherPx}px)`;
-        mask.fillRect(featherPx, featherPx, w - featherPx * 2, h - featherPx * 2);
-        mask.filter = 'none';
+        // filter 없는 소프트 엣지: 인셋 사각형을 축소 캔버스에 그린 뒤 스무딩 업스케일
+        const s = Math.max(2, featherPx);
+        const mw = Math.max(2, Math.round(w / s));
+        const mh = Math.max(2, Math.round(h / s));
+        const cctx = ensureCell(mw, mh);
+        cctx.clearRect(0, 0, mw, mh);
+        cctx.fillStyle = '#000';
+        cctx.fillRect(1, 1, mw - 2, mh - 2);
+        mask.imageSmoothingEnabled = true;
+        mask.drawImage(cellCanvas!, 0, 0, mw, mh, 0, 0, w, h);
       } else {
         mask.fillRect(0, 0, w, h);
       }

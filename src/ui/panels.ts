@@ -85,10 +85,9 @@ export class Sidebar {
       li.append(dot, tid, range, origin);
       li.addEventListener('click', () => {
         this.state.selectedTrackId = track.id;
-        const t0s = track.samples[0]?.t;
-        if (t0s !== undefined && (this.state.currentUs < t0s || this.state.currentUs > t1)) {
-          this.state.setTime(t0s);
-        }
+        // 항상 트랙의 실제 시작(양끝 연장분 제외한 첫 검출/수동 샘플)으로 이동
+        const first = track.samples.find((s) => s.source !== 'held') ?? track.samples[0];
+        if (first) this.state.setTime(first.t);
         this.state.emit('selection');
       });
       this.listEl.appendChild(li);
