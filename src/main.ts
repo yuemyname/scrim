@@ -78,6 +78,7 @@ class App {
   private fileInput: HTMLInputElement;
   private longSide = 512;
   private minConfidence = 0.35;
+  private tiled = false;
   private rendering = false;
   private player: Player | null = null;
 
@@ -134,15 +135,19 @@ class App {
     for (const [v, text] of [
       ['512', '표준 — 빠름'],
       ['768', '정밀 — 군중·원거리 얼굴'],
-      ['1024', '최대 — 가장 느림'],
+      ['1024', '최대 — 느림'],
+      ['tiled', '타일 스캔 — 작은 얼굴 최대 검출 (매우 느림)'],
     ] as const) {
       const opt = document.createElement('option');
       opt.value = v;
       opt.textContent = text;
       select.appendChild(opt);
     }
-    select.value = String(this.longSide);
-    select.addEventListener('change', () => (this.longSide = Number(select.value)));
+    select.value = this.tiled ? 'tiled' : String(this.longSide);
+    select.addEventListener('change', () => {
+      this.tiled = select.value === 'tiled';
+      this.longSide = this.tiled ? 512 : Number(select.value);
+    });
 
     const senseLabel = document.createElement('span');
     senseLabel.textContent = '검출 민감도';
@@ -182,7 +187,7 @@ class App {
     document.addEventListener('visibilitychange', visHandler);
 
     try {
-      const { project, frames } = await this.client.analyze(file, this.longSide, this.minConfidence, (p) => {
+      const { project, frames } = await this.client.analyze(file, this.longSide, this.minConfidence, this.tiled, (p) => {
         lastProgressAt = performance.now();
         progress.update(p);
       });

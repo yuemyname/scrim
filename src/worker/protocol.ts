@@ -1,7 +1,7 @@
 import type { FrameIndex, Progress, Project } from '../types';
 
 export type WorkerRequest =
-  | { type: 'analyze'; jobId: number; file: File; longSide: number; minConfidence: number }
+  | { type: 'analyze'; jobId: number; file: File; longSide: number; minConfidence: number; tiled: boolean }
   | { type: 'render'; jobId: number; file: File; project: Project; maxLongSide: number | null }
   | { type: 'cancel' };
 

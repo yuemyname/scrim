@@ -63,12 +63,13 @@ export class PipelineClient {
     file: File,
     longSide: number,
     minConfidence: number,
+    tiled: boolean,
     onProgress?: (p: Progress) => void,
   ): Promise<{ project: Project; frames: FrameIndex }> {
     const jobId = ++this.jobSeq;
     return new Promise((resolve, reject) => {
       this.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject, onProgress });
-      this.send({ type: 'analyze', jobId, file, longSide, minConfidence });
+      this.send({ type: 'analyze', jobId, file, longSide, minConfidence, tiled });
     });
   }
 

@@ -21,6 +21,8 @@ export interface AnalyzeOptions {
   longSide: number;
   /** 검출 임계값. 기본 0.35 (낮게 잡고 트래커에서 거른다). 오검출이 많으면 올린다 */
   minConfidence?: number;
+  /** 타일 스캔 모드 — 작은 얼굴 검출률 상승, 속도 ~5배 하락 */
+  tiled?: boolean;
 }
 
 export interface RenderOptions {
@@ -77,6 +79,7 @@ export async function analyze(
   const detector = await createDetector({
     minConfidence: opts.minConfidence ?? 0.35,
     longSide: opts.longSide,
+    tiled: opts.tiled ?? false,
     displayWidth: meta.width,
     displayHeight: meta.height,
     rotation: meta.rotation,
