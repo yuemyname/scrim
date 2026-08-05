@@ -9,6 +9,27 @@
  */
 const BANNED_GLOBALS = new Set(['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource']);
 
+/**
+ * assets.ts에서 허용되는 fetch 인자 형태:
+ *  - '/models/...' 문자열 리터럴
+ *  - `${import.meta.env.BASE_URL}models/...` 템플릿 (배포 base 경로 대응)
+ * 둘 다 자체 오리진의 벤더링 경로만 가리킨다.
+ */
+function isAllowedModelPath(arg, sourceCode) {
+  if (arg.type === 'Literal') {
+    return typeof arg.value === 'string' && arg.value.startsWith('/models/');
+  }
+  if (arg.type === 'TemplateLiteral') {
+    const first = arg.quasis[0]?.value.cooked ?? '';
+    if (arg.expressions.length === 0) return first.startsWith('/models/');
+    if (arg.expressions.length !== 1 || first !== '') return false;
+    const expr = arg.expressions[0];
+    if (sourceCode.getText(expr) !== 'import.meta.env.BASE_URL') return false;
+    return (arg.quasis[1]?.value.cooked ?? '').startsWith('models/');
+  }
+  return false;
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 export default {
   meta: {
@@ -54,13 +75,7 @@ export default {
           const call = parent.type === 'CallExpression' && parent.callee === node ? parent : null;
           if (call) {
             const arg = call.arguments[0];
-            const ok =
-              arg &&
-              ((arg.type === 'Literal' && typeof arg.value === 'string' && arg.value.startsWith('/models/')) ||
-                (arg.type === 'TemplateLiteral' &&
-                  arg.quasis[0] &&
-                  arg.quasis[0].value.cooked?.startsWith('/models/')));
-            if (ok) return;
+            if (arg && isAllowedModelPath(arg, context.sourceCode)) return;
             context.report({ node, messageId: 'badModelPath' });
             return;
           }
