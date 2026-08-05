@@ -55,6 +55,11 @@ button:disabled {
   opacity: 0.45;
   cursor: default;
 }
+button.on {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
 button.primary {
   background: var(--ink);
   color: var(--surface);

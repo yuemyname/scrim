@@ -29,6 +29,14 @@ export class Player {
   private drag: DragMode | null = null;
   private rafPending = false;
   private videoUrl: string | null = null;
+  /** 박스 추가 모드: 기존 트랙 위에서도 항상 새 박스를 그린다 (겹치는 레이어 생성용) */
+  addBoxMode = false;
+  onAddBoxModeChange: ((on: boolean) => void) | null = null;
+
+  setAddBoxMode(on: boolean): void {
+    this.addBoxMode = on;
+    this.onAddBoxModeChange?.(on);
+  }
 
   constructor(state: AppState) {
     this.state = state;
@@ -291,6 +299,12 @@ export class Player {
       const handleNX = HANDLE_PX / rect.width;
       const handleNY = HANDLE_PX / rect.height;
 
+      // 박스 추가 모드: 아래에 무엇이 있든 새 박스 생성으로 직행 (겹침 레이어)
+      if (this.addBoxMode) {
+        this.drag = { kind: 'create', startX: p.x, startY: p.y, box: { x: p.x, y: p.y, w: 0, h: 0 } };
+        return;
+      }
+
       // 1) 선택된 트랙의 모서리 → resize (자동 트랙도 편집 가능 — 'manual' 키프레임이 얹힌다)
       const sel = this.state.selectedTrack();
       if (sel) {
@@ -379,8 +393,10 @@ export class Player {
         this.drag = null;
         if (b.w > 0.01 && b.h > 0.01) {
           this.createManualTrack(b);
-        } else {
-          // 클릭만 한 경우: 선택 해제
+          // 박스가 실제로 만들어지면 추가 모드는 1회로 종료
+          if (this.addBoxMode) this.setAddBoxMode(false);
+        } else if (!this.addBoxMode) {
+          // 클릭만 한 경우: 선택 해제 (추가 모드에서는 모드 유지)
           this.state.selectedTrackId = null;
           this.state.emit('selection');
         }

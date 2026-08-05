@@ -343,6 +343,15 @@ class App {
       else toast('다시 실행할 작업이 없습니다');
     });
 
+    const addBoxBtn = document.createElement('button');
+    addBoxBtn.textContent = '+ 박스';
+    addBoxBtn.title = '기존 가림 위에도 새 박스를 겹쳐 그립니다 (B)';
+    addBoxBtn.addEventListener('click', () => player.setAddBoxMode(!player.addBoxMode));
+    player.onAddBoxModeChange = (on) => {
+      addBoxBtn.classList.toggle('on', on);
+      if (on) toast('화면에서 드래그해 새 박스를 그리세요');
+    };
+
     const cutBtn = document.createElement('button');
     cutBtn.textContent = '컷 표시';
     cutBtn.title = '현재 위치에 장면 경계 마커 추가/삭제 (C)';
@@ -359,7 +368,7 @@ class App {
     exportBtn.textContent = '내보내기';
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
-    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, cutBtn, spacer, hazardCount, exportBtn);
+    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, cutBtn, spacer, hazardCount, exportBtn);
 
     const timeline = new Timeline(state);
     timeline.onHazardCountChange = (count) => {
@@ -415,6 +424,9 @@ class App {
       } else if ((e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         this.toggleCut();
+      } else if ((e.key === 'b' || e.key === 'B') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        player.setAddBoxMode(!player.addBoxMode);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         const sel = this.state.selectedTrack();
         const project = this.state.project;
