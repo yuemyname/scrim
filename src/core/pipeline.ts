@@ -17,14 +17,8 @@ import { createEncoder, defaultBitrate } from './encode';
 import { drawVideoFrame } from './orient';
 
 export interface AnalyzeOptions {
-  /** 검출 입력 긴 변. 512 표준 / 768·1024 정밀 모드 */
-  longSide: number;
   /** 검출 임계값. 기본 0.35 (낮게 잡고 트래커에서 거른다). 오검출이 많으면 올린다 */
   minConfidence?: number;
-  /** 타일 스캔 모드 — 작은 얼굴 검출률 상승, 속도 ~5배 하락 */
-  tiled?: boolean;
-  /** 검출 엔진: yunet(기본, 군중·원거리 강화) / blaze(MediaPipe) */
-  engine?: 'yunet' | 'blaze';
 }
 
 export interface RenderOptions {
@@ -80,9 +74,6 @@ export async function analyze(
 
   const detector = await createDetector({
     minConfidence: opts.minConfidence ?? 0.35,
-    longSide: opts.longSide,
-    tiled: opts.tiled ?? false,
-    engine: opts.engine ?? 'yunet',
     displayWidth: meta.width,
     displayHeight: meta.height,
     rotation: meta.rotation,

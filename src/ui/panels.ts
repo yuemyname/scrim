@@ -153,6 +153,7 @@ export class Sidebar {
       { k: 'mosaic', label: '모자이크' },
       { k: 'solid', label: '솔리드' },
       { k: 'blur', label: '블러', title: '블러는 반경이 작으면 복원될 수 있어 최소 강도가 강제됩니다' },
+      { k: 'sticker', label: '스티커', title: '모자이크 바탕 위에 이모지/문구를 얹습니다' },
     ];
     for (const { k, label, title } of kinds) {
       const b = document.createElement('button');
@@ -208,6 +209,40 @@ export class Sidebar {
       slider('강도', style.strength, 0.04, 0.3, 0.01, (v) => (live().strength = v));
     } else if (style.kind === 'blur') {
       slider('강도', Math.max(style.strength, 12), 12, 60, 1, (v) => (live().strength = v));
+    } else if (style.kind === 'sticker') {
+      // 이모지/문구 입력 + 빠른 선택
+      const row = document.createElement('div');
+      row.className = 'row';
+      const l = document.createElement('label');
+      l.textContent = '내용';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'sticker-input';
+      input.maxLength = 20;
+      input.value = style.sticker ?? '🙂';
+      input.placeholder = '🙂 또는 문구';
+      let pushed = false;
+      input.addEventListener('input', () => {
+        if (!pushed) {
+          this.state.pushUndo();
+          pushed = true;
+        }
+        if (sel && !sel.style) sel.style = structuredClone(project.globalStyle);
+        live().sticker = input.value;
+        this.state.emit('project');
+      });
+      row.append(l, input);
+      this.styleEl.appendChild(row);
+
+      const presets = document.createElement('div');
+      presets.className = 'row sticker-presets';
+      for (const e of ['🙂', '😎', '🐻', '⭐️', '🌸', '🫥']) {
+        const b = document.createElement('button');
+        b.textContent = e;
+        b.addEventListener('click', () => commit((s) => (s.sticker = e)));
+        presets.appendChild(b);
+      }
+      this.styleEl.appendChild(presets);
     }
     slider('여백', style.scale, 1.0, 2.2, 0.05, (v) => (live().scale = v));
     slider('페더', style.feather, 0, 0.6, 0.05, (v) => (live().feather = v));

@@ -258,6 +258,23 @@ select {
   color: var(--ink-muted);
   flex: none;
 }
+.style-panel .sticker-input {
+  flex: 1;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 5px 8px;
+  font-family: var(--font-ui);
+  min-width: 0;
+}
+.sticker-presets {
+  flex-wrap: wrap;
+}
+.sticker-presets button {
+  padding: 4px 8px;
+  font-size: 16px;
+}
 .style-panel input[type='range'] {
   flex: 1;
   accent-color: var(--ink);

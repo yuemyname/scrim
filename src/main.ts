@@ -86,10 +86,7 @@ class App {
   private client = new PipelineClient();
   private root: HTMLElement;
   private fileInput: HTMLInputElement;
-  private longSide = 512;
   private minConfidence = 0.35;
-  private tiled = false;
-  private engine: 'yunet' | 'blaze' = 'yunet';
   private rendering = false;
   private player: Player | null = null;
 
@@ -140,26 +137,6 @@ class App {
 
     const options = document.createElement('div');
     options.className = 'options';
-    const label = document.createElement('span');
-    label.textContent = '검출 정밀도';
-    const select = document.createElement('select');
-    for (const [v, text] of [
-      ['512', '표준 — 빠름'],
-      ['768', '정밀 — 군중·원거리 얼굴'],
-      ['1024', '최대 — 느림'],
-      ['tiled', '타일 스캔 — 작은 얼굴 최대 검출 (매우 느림)'],
-    ] as const) {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = text;
-      select.appendChild(opt);
-    }
-    select.value = this.tiled ? 'tiled' : String(this.longSide);
-    select.addEventListener('change', () => {
-      this.tiled = select.value === 'tiled';
-      this.longSide = this.tiled ? 512 : Number(select.value);
-    });
-
     const senseLabel = document.createElement('span');
     senseLabel.textContent = '검출 민감도';
     const senseSelect = document.createElement('select');
@@ -176,22 +153,7 @@ class App {
     senseSelect.value = String(this.minConfidence);
     senseSelect.addEventListener('change', () => (this.minConfidence = Number(senseSelect.value)));
 
-    const engineLabel = document.createElement('span');
-    engineLabel.textContent = '검출 엔진';
-    const engineSelect = document.createElement('select');
-    for (const [v, text] of [
-      ['yunet', '강화 — 군중·원거리 (기본)'],
-      ['blaze', '기존 — MediaPipe'],
-    ] as const) {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = text;
-      engineSelect.appendChild(opt);
-    }
-    engineSelect.value = this.engine;
-    engineSelect.addEventListener('change', () => (this.engine = engineSelect.value as 'yunet' | 'blaze'));
-
-    options.append(engineLabel, engineSelect, label, select, senseLabel, senseSelect);
+    options.append(senseLabel, senseSelect);
 
     const resumeBtn = document.createElement('button');
     resumeBtn.textContent = '저장한 프로젝트 이어서 작업';
@@ -349,7 +311,7 @@ class App {
     document.addEventListener('visibilitychange', visHandler);
 
     try {
-      const { project, frames } = await this.client.analyze(file, this.longSide, this.minConfidence, this.tiled, this.engine, (p) => {
+      const { project, frames } = await this.client.analyze(file, this.minConfidence, (p) => {
         lastProgressAt = performance.now();
         progress.update(p);
       });

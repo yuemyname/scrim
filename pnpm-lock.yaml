@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@mediapipe/tasks-vision':
-        specifier: ^0.10.14
-        version: 0.10.35
       mp4-muxer:
         specifier: ^5.1.5
         version: 5.2.2
@@ -234,9 +231,6 @@ packages:
   '@humanwhocodes/retry@0.4.3':
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
-
-  '@mediapipe/tasks-vision@0.10.35':
-    resolution: {integrity: sha512-HOvadwVRE6JC+45nyYhmnywnr5h/J8KZvOeUNVOG9q/0875pZgItznFB9bRTvLc264YSJqiZ1NsIpCStJw/egg==}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -1043,8 +1037,6 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
-
-  '@mediapipe/tasks-vision@0.10.35': {}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true

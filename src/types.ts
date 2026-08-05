@@ -25,7 +25,7 @@ export interface TrackSample {
 }
 
 export type ShapeKind = 'ellipse' | 'rect';
-export type RedactKind = 'mosaic' | 'solid' | 'blur';
+export type RedactKind = 'mosaic' | 'solid' | 'blur' | 'sticker';
 
 export interface RedactStyle {
   kind: RedactKind;
@@ -36,6 +36,8 @@ export interface RedactStyle {
   feather: number;
   /** 박스 확대 배율. 이마·턱·머리카락까지 덮기 위해 기본 1.4 */
   scale: number;
+  /** kind='sticker'일 때 표시할 이모지/문구. 모자이크 바탕 위에 그려진다 */
+  sticker?: string;
 }
 
 export interface Track {

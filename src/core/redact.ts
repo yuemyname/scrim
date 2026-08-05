@@ -110,6 +110,21 @@ export function redactFrame(
         work.fillRect(0, 0, w, h);
         break;
       }
+      case 'sticker': {
+        // 이모지만으로는 얼굴이 다 가려지지 않을 수 있다 — 모자이크 바탕을 깔고
+        // 이모지/문구는 마스크 적용 후에 얹는다 (아래 별도 처리)
+        const cell = Math.max(3, Math.round(short * 0.12));
+        const sw = Math.max(1, Math.ceil(w / cell));
+        const sh = Math.max(1, Math.ceil(h / cell));
+        const cctx = ensureCell(sw, sh);
+        cctx.imageSmoothingEnabled = true;
+        cctx.clearRect(0, 0, sw, sh);
+        cctx.drawImage(src, x, y, w, h, 0, 0, sw, sh);
+        work.imageSmoothingEnabled = false;
+        work.drawImage(cellCanvas!, 0, 0, sw, sh, 0, 0, w, h);
+        work.imageSmoothingEnabled = true;
+        break;
+      }
     }
 
     // 2) 모양 + 페더 알파 마스크를 destination-in으로 적용
@@ -156,6 +171,29 @@ export function redactFrame(
     work.globalCompositeOperation = 'destination-in';
     work.drawImage(maskCanvas!, 0, 0, w, h, 0, 0, w, h);
     work.globalCompositeOperation = 'source-over';
+
+    // 2.5) 스티커: 마스크 적용 후 이모지/문구를 온전한 형태로 얹는다
+    if (style.kind === 'sticker') {
+      const text = (style.sticker ?? '🙂').trim() || '🙂';
+      work.save();
+      work.textAlign = 'center';
+      work.textBaseline = 'middle';
+      // 짧은 변의 90%에서 시작해 폭에 맞게 축소
+      let fontPx = short * 0.9;
+      work.font = `${fontPx}px sans-serif`;
+      const measured = work.measureText(text).width;
+      if (measured > w * 0.95) {
+        fontPx = (fontPx * (w * 0.95)) / Math.max(1, measured);
+        work.font = `${fontPx}px sans-serif`;
+      }
+      // 문구(비이모지)일 때 가독성을 위한 흰 글자 + 어두운 윤곽
+      work.strokeStyle = 'rgba(0,0,0,0.7)';
+      work.lineWidth = Math.max(1, fontPx * 0.06);
+      work.fillStyle = '#FFFFFF';
+      work.strokeText(text, w / 2, h / 2);
+      work.fillText(text, w / 2, h / 2);
+      work.restore();
+    }
 
     // 3) 본 캔버스에 합성
     ctx.drawImage(workCanvas!, 0, 0, w, h, x, y, w, h);
