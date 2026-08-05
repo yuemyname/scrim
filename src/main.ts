@@ -12,6 +12,7 @@ import { openModal, openPrivacyModal, openProgressModal } from './ui/modal';
 import { saveBlob, exportProjectJson, parseProjectJson } from './ui/save';
 import { toast } from './ui/toast';
 import { timecode } from './ui/format';
+import { nearestIndex } from './ui/frameState';
 import { verifyAssets } from './core/assets';
 
 const app = document.getElementById('app');
@@ -337,6 +338,11 @@ class App {
       else toast('다시 실행할 작업이 없습니다');
     });
 
+    const cutBtn = document.createElement('button');
+    cutBtn.textContent = '컷 표시';
+    cutBtn.title = '현재 위치에 장면 경계 마커 추가/삭제 (C)';
+    cutBtn.addEventListener('click', () => this.toggleCut());
+
     const spacer = document.createElement('span');
     spacer.className = 'spacer';
 
@@ -348,7 +354,7 @@ class App {
     exportBtn.textContent = '내보내기';
     exportBtn.addEventListener('click', () => void this.exportVideo());
 
-    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, spacer, hazardCount, exportBtn);
+    transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, cutBtn, spacer, hazardCount, exportBtn);
 
     const timeline = new Timeline(state);
     timeline.onHazardCountChange = (count) => {
@@ -401,6 +407,9 @@ class App {
       } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         if (!timeline.jumpToNextHazard()) toast('미검증 구간이 없습니다');
+      } else if ((e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        this.toggleCut();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         const sel = this.state.selectedTrack();
         const project = this.state.project;
@@ -424,6 +433,29 @@ class App {
         if (this.state.redo()) toast('다시 실행했습니다');
       }
     });
+  }
+
+  /** 현재 위치에 컷 마커 추가/삭제 (가장 가까운 프레임에 스냅) */
+  private toggleCut(): void {
+    const state = this.state;
+    const frames = state.frames;
+    const project = state.project;
+    if (!frames || !project || frames.timestampsUs.length === 0) return;
+    frames.cutsUs ??= [];
+    const idx = nearestIndex(frames.timestampsUs, state.currentUs);
+    const t = frames.timestampsUs[idx];
+    if (t === undefined) return;
+    const frameUs = project.source.durationUs / Math.max(1, project.source.frameCount);
+    const existing = frames.cutsUs.findIndex((c) => Math.abs(c - t) <= frameUs);
+    if (existing >= 0) {
+      frames.cutsUs.splice(existing, 1);
+      toast('컷 마커를 삭제했습니다');
+    } else {
+      frames.cutsUs.push(t);
+      frames.cutsUs.sort((a, b) => a - b);
+      toast('컷 마커를 추가했습니다');
+    }
+    state.emit('project');
   }
 
   private exportChoice: number | null | 'unset' = 'unset';
