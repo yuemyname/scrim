@@ -1,0 +1,407 @@
+/* scrim — 계측 도구처럼 보여야 한다. 라운드 2px, 그림자 없음, 색은 경고 하나에만. */
+
+:root {
+  --surface: #16161A;
+  --panel: #1F1F26;
+  --line: #32323C;
+  --ink: #E8E6E1;
+  --ink-muted: #8A8A93;
+  --hazard: #FFD400; /* 미검증 구간 사선. 다른 어디에도 쓰지 않는다 */
+
+  --font-ui: 'Pretendard', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Mono', ui-monospace, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--ink-muted);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.primary {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 헤더 ─────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.topbar .brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 15px;
+}
+
+/* ── 랜딩 ─────────────────────────────── */
+.landing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+}
+.dropzone {
+  width: min(560px, 90%);
+  padding: 64px 32px;
+  border: 1px dashed var(--line);
+  border-radius: 2px;
+  text-align: center;
+  color: var(--ink-muted);
+  cursor: pointer;
+  line-height: 1.7;
+}
+.dropzone.dragover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.landing .options {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--ink-muted);
+}
+select {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 5px 8px;
+  font-family: var(--font-ui);
+}
+
+/* ── 메인 레이아웃 ─────────────────────── */
+.workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  position: relative;
+  background: #0E0E11;
+}
+.player-wrap {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+}
+.player-wrap video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  pointer-events: none;
+}
+.player-wrap canvas.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* ── 사이드바 ─────────────────────────── */
+.sidebar {
+  width: 260px;
+  flex: none;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.sidebar h2 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted);
+  padding: 14px 14px 8px;
+}
+.track-list {
+  list-style: none;
+}
+.track-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.track-list li.selected {
+  background: var(--surface);
+  border-left-color: var(--ink);
+}
+.track-list li .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-muted);
+  flex: none;
+}
+.track-list li.enabled .dot {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.track-list li .tid {
+  width: 32px;
+}
+.track-list li .range {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+.track-list li .origin-tag {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+.empty-note {
+  padding: 6px 14px;
+  color: var(--ink-muted);
+  line-height: 1.6;
+}
+
+.style-panel {
+  padding: 4px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.style-panel .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.style-panel label {
+  width: 44px;
+  color: var(--ink-muted);
+  flex: none;
+}
+.style-panel input[type='range'] {
+  flex: 1;
+  accent-color: var(--ink);
+}
+.seg {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  flex: 1;
+}
+.seg button {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  padding: 5px 0;
+  background: transparent;
+  color: var(--ink-muted);
+}
+.seg button.on {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+/* ── 하단 컨트롤/타임라인 ───────────────── */
+.bottombar {
+  flex: none;
+  border-top: 1px solid var(--line);
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.transport .time {
+  color: var(--ink-muted);
+}
+.transport .time b {
+  color: var(--ink);
+  font-weight: 500;
+}
+.transport .spacer {
+  flex: 1;
+}
+.hazard-count {
+  color: var(--hazard);
+  font-size: 12px;
+}
+.hazard-count.clear {
+  color: var(--ink-muted);
+}
+.timeline-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+canvas.timeline,
+canvas.strip {
+  width: 100%;
+  display: block;
+  border-radius: 2px;
+  touch-action: none;
+}
+canvas.timeline {
+  height: 26px;
+  cursor: pointer;
+}
+canvas.strip {
+  height: 16px;
+}
+.strip-hint {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+.strip-hint kbd {
+  font-family: var(--font-mono);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+/* ── 푸터 ─────────────────────────────── */
+.privacy-footer {
+  flex: none;
+  text-align: center;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+.privacy-footer a {
+  color: var(--ink-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── 모달/진행/토스트 ───────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 24px;
+  width: min(440px, 90vw);
+  line-height: 1.7;
+}
+.modal h3 {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.modal p {
+  color: var(--ink-muted);
+  margin-bottom: 10px;
+}
+.modal .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.progress-track {
+  height: 4px;
+  background: var(--surface);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 14px 0 6px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--ink);
+  width: 0%;
+}
+.toast {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 8px 16px;
+  z-index: 200;
+}
+.warn-banner {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--hazard);
+  padding: 8px 12px;
+  margin: 0 16px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+/* 모션은 검증 스트립 점프 시 플레이헤드 이동 하나만 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

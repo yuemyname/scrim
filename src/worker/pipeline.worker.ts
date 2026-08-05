@@ -1,0 +1,59 @@
+/**
+ * 분석/렌더 전용 Worker. UI 스레드 블로킹 방지.
+ * AbortSignal로 취소 가능 — 10분짜리 렌더를 멈출 수 없으면 못 쓰는 도구다.
+ */
+import { analyze, render } from '../core/pipeline';
+import { UnsupportedSourceError } from '../core/demux';
+import type { WorkerRequest, WorkerResponse } from './protocol';
+
+const post = (msg: WorkerResponse): void => {
+  (self as unknown as { postMessage(m: unknown): void }).postMessage(msg);
+};
+
+let controller: AbortController | null = null;
+
+self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
+  const msg = e.data;
+
+  if (msg.type === 'cancel') {
+    controller?.abort();
+    return;
+  }
+
+  controller = new AbortController();
+  const { signal } = controller;
+  const jobId = msg.jobId;
+
+  try {
+    if (msg.type === 'analyze') {
+      const result = await analyze(
+        msg.file,
+        { longSide: msg.longSide },
+        (p) => post({ type: 'progress', jobId, progress: p }),
+        signal,
+      );
+      post({ type: 'analyzed', jobId, project: result.project, frames: result.frames });
+    } else if (msg.type === 'render') {
+      const blob = await render(
+        msg.file,
+        msg.project,
+        (p) => post({ type: 'progress', jobId, progress: p }),
+        signal,
+      );
+      post({ type: 'rendered', jobId, blob });
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      post({ type: 'cancelled', jobId });
+    } else {
+      post({
+        type: 'error',
+        jobId,
+        message: err instanceof Error ? err.message : String(err),
+        unsupported: err instanceof UnsupportedSourceError,
+      });
+    }
+  } finally {
+    controller = null;
+  }
+};
