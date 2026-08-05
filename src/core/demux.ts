@@ -6,10 +6,22 @@ import { createFile, DataStream } from 'mp4box';
 import type { MP4File, MP4Info, MP4MediaTrack, MP4Sample, SampleEntry } from 'mp4box';
 import type { SourceMeta } from '../types';
 
+/**
+ * 오디오 원본 샘플. EncodedAudioChunk를 쓰지 않는 이유:
+ * Safari는 WebCodecs 오디오 클래스가 없는 버전이 많고, 우리는 디코드하지 않으므로
+ * muxer에 그대로 넘길 순수 데이터만 있으면 된다.
+ */
+export interface AudioSample {
+  data: Uint8Array;
+  type: 'key' | 'delta';
+  timestampUs: number;
+  durationUs: number;
+}
+
 export interface AudioPassthrough {
   config: { codec: string; numberOfChannels: number; sampleRate: number };
   description: Uint8Array; // esds / AudioSpecificConfig
-  chunks: EncodedAudioChunk[];
+  chunks: AudioSample[];
 }
 
 export interface DemuxResult {
@@ -207,15 +219,12 @@ function buildAudioPassthrough(
   const description = specificInfo?.data;
   if (!description || description.length === 0) return null;
 
-  const chunks = samples.map(
-    (s) =>
-      new EncodedAudioChunk({
-        type: s.is_sync ? 'key' : 'delta',
-        timestamp: toUs(s.cts, s.timescale),
-        duration: toUs(s.duration, s.timescale),
-        data: s.data,
-      }),
-  );
+  const chunks: AudioSample[] = samples.map((s) => ({
+    data: s.data,
+    type: s.is_sync ? ('key' as const) : ('delta' as const),
+    timestampUs: toUs(s.cts, s.timescale),
+    durationUs: toUs(s.duration, s.timescale),
+  }));
 
   return {
     config: {

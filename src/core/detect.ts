@@ -28,11 +28,14 @@ export interface DetectorOptions {
 
 export async function createDetector(opts: DetectorOptions): Promise<Detector> {
   const fileset = await FilesetResolver.forVisionTasks(WASM_ROOT);
-  const detector = await FaceDetector.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: FACE_MODEL_PATH, delegate: 'GPU' },
-    runningMode: 'VIDEO',
-    minDetectionConfidence: opts.minConfidence,
-  });
+  const makeDetector = (delegate: 'GPU' | 'CPU'): Promise<FaceDetector> =>
+    FaceDetector.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: FACE_MODEL_PATH, delegate },
+      runningMode: 'VIDEO',
+      minDetectionConfidence: opts.minConfidence,
+    });
+  // 일부 브라우저(특히 워커 내 WebGL 제약)에서 GPU 델리게이트가 실패한다 → CPU 폴백
+  const detector = await makeDetector('GPU').catch(() => makeDetector('CPU'));
 
   // 다운스케일 후 검출: 1080p 원본 그대로 넣으면 3~4배 느리고 정확도 이득이 거의 없다.
   const scale = Math.min(1, opts.longSide / Math.max(opts.displayWidth, opts.displayHeight));

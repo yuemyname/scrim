@@ -46,10 +46,12 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     if (err instanceof DOMException && err.name === 'AbortError') {
       post({ type: 'cancelled', jobId });
     } else {
+      console.error('[scrim worker]', err);
+      const name = err instanceof Error && err.name !== 'Error' ? `${err.name}: ` : '';
       post({
         type: 'error',
         jobId,
-        message: err instanceof Error ? err.message : String(err),
+        message: `${name}${err instanceof Error ? err.message : String(err)}`,
         unsupported: err instanceof UnsupportedSourceError,
       });
     }

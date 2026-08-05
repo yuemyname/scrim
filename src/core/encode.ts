@@ -4,6 +4,7 @@
  */
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import type { AudioPassthrough } from './demux';
+import { waitDequeue } from './queue';
 
 const MAX_ENCODE_QUEUE = 8;
 const KEYFRAME_INTERVAL_US = 2_000_000; // 2초
@@ -75,21 +76,13 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
   });
 
   let lastKeyUs = -Infinity;
-  const audioData: { data: Uint8Array; type: 'key' | 'delta'; ts: number; dur: number }[] = [];
-  if (opts.audio) {
-    for (const c of opts.audio.chunks) {
-      const buf = new Uint8Array(c.byteLength);
-      c.copyTo(buf);
-      audioData.push({ data: buf, type: c.type as 'key' | 'delta', ts: c.timestamp, dur: c.duration ?? 0 });
-    }
-  }
 
   return {
     async encodeFrame(frame: VideoFrame): Promise<void> {
       if (error) throw error;
-      // 백프레셔
+      // 백프레셔. dequeue 이벤트 미지원 브라우저 대비 타임아웃 폴백.
       while (encoder.encodeQueueSize > MAX_ENCODE_QUEUE) {
-        await new Promise<void>((r) => encoder.addEventListener('dequeue', () => r(), { once: true }));
+        await waitDequeue(encoder);
         if (error) throw error;
       }
       const keyFrame = frame.timestamp - lastKeyUs >= KEYFRAME_INTERVAL_US;
@@ -100,8 +93,8 @@ export async function createEncoder(opts: EncoderOptions): Promise<Encoder> {
       await encoder.flush();
       if (error) throw error;
       encoder.close();
-      for (const a of audioData) {
-        muxer.addAudioChunkRaw(a.data, a.type, a.ts, a.dur);
+      for (const a of opts.audio?.chunks ?? []) {
+        muxer.addAudioChunkRaw(a.data, a.type, a.timestampUs, a.durationUs);
       }
       muxer.finalize();
       const { buffer } = muxer.target as ArrayBufferTarget;

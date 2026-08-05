@@ -8,6 +8,8 @@
  * 이 모듈의 소비자는 timestamp 기준으로만 동작해야 한다 (B-frame 안전).
  */
 
+import { waitDequeue } from './queue';
+
 const MAX_DECODE_QUEUE = 8;
 
 export function decodeStream(
@@ -55,8 +57,9 @@ export function decodeStream(
       for (const chunk of chunks) {
         if (failed || signal.aborted) return;
         // 백프레셔: 큐가 쌓이면 대기. 없으면 1080p 장시간 영상에서 탭이 죽는다.
+        // dequeue 이벤트 미지원 브라우저 대비 타임아웃 폴백 포함.
         while (decoder.decodeQueueSize > MAX_DECODE_QUEUE) {
-          await new Promise<void>((r) => decoder.addEventListener('dequeue', () => r(), { once: true }));
+          await waitDequeue(decoder);
           if (failed || signal.aborted) return;
         }
         decoder.decode(chunk);
