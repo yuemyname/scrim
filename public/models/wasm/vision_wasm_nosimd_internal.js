@@ -8816,3 +8816,11 @@ if (typeof exports === 'object' && typeof module === 'object') {
 } else if (typeof define === 'function' && define['amd'])
   define([], () => ModuleFactory);
 
+
+// scrim patch: 모듈 워커에서 dynamic import로 로드될 때도 전역 등록 (tasks-vision 로더 호환)
+// 이 로더는 클래식 스크립트(sloppy mode) 전제로 작성되어 모듈(strict mode)에서 두 가지가 깨진다:
+// 1) var ModuleFactory가 전역이 되지 않음  2) 블록 안 함수 선언 custom_dbg가 블록 밖에서 참조됨
+if (typeof ModuleFactory !== "undefined") { globalThis.ModuleFactory = ModuleFactory; }
+if (typeof globalThis.custom_dbg === "undefined") {
+  globalThis.custom_dbg = function () { console.warn.apply(console, arguments); };
+}
