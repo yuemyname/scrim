@@ -58,17 +58,27 @@ export class Sidebar {
       return;
     }
 
-    // 일괄 작업 바 (체크된 트랙이 있을 때만)
+    // 일괄 작업 바 — 전체 선택/해제 토글은 항상, 나머지는 체크된 트랙이 있을 때
     const checked = this.state.checkedTracks();
+    const act = (text: string, fn: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.addEventListener('click', fn);
+      return b;
+    };
+
+    const allChecked = checked.length === project.tracks.length;
+    this.batchEl.append(
+      act(allChecked ? '전체 해제' : '전체 선택', () => {
+        this.state.checkedIds.clear();
+        if (!allChecked) for (const t of project.tracks) this.state.checkedIds.add(t.id);
+        this.state.emit('selection');
+      }),
+    );
+
     if (checked.length > 0) {
       const label = document.createElement('span');
       label.textContent = `${checked.length}개 선택`;
-      const act = (text: string, fn: () => void): HTMLButtonElement => {
-        const b = document.createElement('button');
-        b.textContent = text;
-        b.addEventListener('click', fn);
-        return b;
-      };
       this.batchEl.append(
         label,
         act('끄기', () => {
@@ -89,10 +99,6 @@ export class Sidebar {
           if (this.state.selectedTrackId && ids.has(this.state.selectedTrackId)) this.state.selectedTrackId = null;
           this.state.emit('selection');
           this.state.emit('project');
-        }),
-        act('해제', () => {
-          this.state.checkedIds.clear();
-          this.state.emit('selection');
         }),
       );
     }
