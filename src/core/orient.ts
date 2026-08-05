@@ -34,3 +34,32 @@ export function drawFrameOriented(
   }
   ctx.restore();
 }
+
+let videoFrameDrawMode: 'direct' | 'bitmap' = 'direct';
+
+/**
+ * VideoFrame을 캔버스에 그린다. 일부 Safari 버전은 drawImage(VideoFrame)를
+ * 지원하지 않아 TypeError를 던진다 → ImageBitmap 경유 폴백 (한 번 실패하면 이후 계속 폴백 사용).
+ */
+export async function drawVideoFrame(
+  ctx: Ctx2D,
+  frame: VideoFrame,
+  rotation: number,
+  dw: number,
+  dh: number,
+): Promise<void> {
+  if (videoFrameDrawMode === 'direct') {
+    try {
+      drawFrameOriented(ctx, frame as unknown as CanvasImageSource, rotation, dw, dh);
+      return;
+    } catch {
+      videoFrameDrawMode = 'bitmap';
+    }
+  }
+  const bmp = await createImageBitmap(frame);
+  try {
+    drawFrameOriented(ctx, bmp, rotation, dw, dh);
+  } finally {
+    bmp.close();
+  }
+}

@@ -14,7 +14,7 @@ import { createDetector } from './detect';
 import { buildTracks, sampleTrackAt } from './track';
 import { redactFrame } from './redact';
 import { createEncoder, defaultBitrate } from './encode';
-import { drawFrameOriented } from './orient';
+import { drawVideoFrame } from './orient';
 
 export interface AnalyzeOptions {
   /** 검출 입력 긴 변. 512 표준 / 768·1024 정밀 모드 */
@@ -30,6 +30,20 @@ export function makeProgressThrottle(onProgress: (p: Progress) => void): (p: Pro
       last = now;
       onProgress(p);
     }
+  };
+}
+
+/** 오류에 발생 단계를 라벨링해 리포트만으로 위치를 특정할 수 있게 한다 */
+function stageError(stage: string, e: unknown): Error {
+  if (e instanceof DOMException && e.name === 'AbortError') return e;
+  if (e instanceof Error && e.name === 'UnsupportedSourceError') return e;
+  const name = e instanceof Error && e.name !== 'Error' ? `${e.name}: ` : '';
+  return new Error(`[${stage}] ${name}${e instanceof Error ? e.message : String(e)}`);
+}
+
+function rethrowWithStage(stage: string): (e: unknown) => never {
+  return (e: unknown) => {
+    throw stageError(stage, e);
   };
 }
 
@@ -50,7 +64,7 @@ export async function analyze(
 ): Promise<{ project: Project; frames: FrameIndex }> {
   const progress = makeProgressThrottle(onProgress);
   progress({ phase: 'demux', done: 0, total: 1, etaMs: 0 });
-  const { meta, videoConfig, videoChunks } = await demux(file);
+  const { meta, videoConfig, videoChunks } = await demux(file).catch(rethrowWithStage('영상 읽기'));
   progress({ phase: 'demux', done: 1, total: 1, etaMs: 0 });
 
   const detector = await createDetector({
@@ -74,7 +88,7 @@ export async function analyze(
       async (frame) => {
         try {
           const t = frame.timestamp;
-          const detections = detector.detect(frame, t);
+          const detections = await detector.detect(frame, t).catch(rethrowWithStage('프레임 분석'));
           perFrame.push({ t, detections });
         } finally {
           // 좌표만 남기고 프레임은 즉시 닫는다
@@ -84,7 +98,7 @@ export async function analyze(
         progress({ phase: 'analyze', done, total: meta.frameCount, etaMs: eta.eta(done, meta.frameCount) });
       },
       signal,
-    );
+    ).catch(rethrowWithStage('디코딩'));
   } finally {
     detector.close();
   }
@@ -117,7 +131,7 @@ export async function render(
 ): Promise<Blob> {
   const progress = makeProgressThrottle(onProgress);
   progress({ phase: 'demux', done: 0, total: 1, etaMs: 0 });
-  const { meta, videoConfig, videoChunks, audio } = await demux(file);
+  const { meta, videoConfig, videoChunks, audio } = await demux(file).catch(rethrowWithStage('영상 읽기'));
   progress({ phase: 'demux', done: 1, total: 1, etaMs: 0 });
 
   const fps = meta.frameCount / Math.max(0.001, meta.durationUs / 1e6);
@@ -136,7 +150,7 @@ export async function render(
     fps,
     bitrate: defaultBitrate(outW, outH, fps, outScale === 1 ? file.size : 0, meta.durationUs),
     audio,
-  });
+  }).catch(rethrowWithStage('인코더 초기화'));
 
   // 렌더 캔버스 (표시 방향, 회전 baked)
   const canvas = new OffscreenCanvas(outW, outH);
@@ -156,16 +170,22 @@ export async function render(
         try {
           if (signal.aborted) return;
           const t = frame.timestamp;
-          drawFrameOriented(ctx, frame, meta.rotation, outW, outH);
+          await drawVideoFrame(ctx, frame, meta.rotation, outW, outH).catch(rethrowWithStage('프레임 합성'));
           const boxes = [];
           for (const track of enabledTracks) {
             const box = sampleTrackAt(track, t);
             if (box) boxes.push({ box, style: styleOf(track) });
           }
           if (boxes.length > 0) redactFrame(ctx, null, boxes, renderMeta);
-          const out = new VideoFrame(canvas, { timestamp: t, duration: frame.duration ?? undefined });
+          const out = ((): VideoFrame => {
+            try {
+              return new VideoFrame(canvas, { timestamp: t, duration: frame.duration ?? undefined });
+            } catch (e) {
+              throw stageError('캔버스→프레임 변환', e);
+            }
+          })();
           try {
-            await encoder.encodeFrame(out);
+            await encoder.encodeFrame(out).catch(rethrowWithStage('인코딩'));
           } finally {
             out.close();
           }

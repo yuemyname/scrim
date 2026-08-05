@@ -8,10 +8,10 @@
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
 import { FACE_MODEL_PATH, WASM_ROOT } from './assets';
 import type { Box, Detection } from '../types';
-import { drawFrameOriented } from './orient';
+import { drawVideoFrame } from './orient';
 
 export interface Detector {
-  detect(frame: VideoFrame, timestampUs: number): Detection[];
+  detect(frame: VideoFrame, timestampUs: number): Promise<Detection[]>;
   close(): void;
 }
 
@@ -49,8 +49,8 @@ export async function createDetector(opts: DetectorOptions): Promise<Detector> {
   let lastTsMs = -1;
 
   return {
-    detect(frame: VideoFrame, timestampUs: number): Detection[] {
-      drawFrameOriented(ctx, frame, opts.rotation, cw, ch);
+    async detect(frame: VideoFrame, timestampUs: number): Promise<Detection[]> {
+      await drawVideoFrame(ctx, frame, opts.rotation, cw, ch);
       // detectForVideo의 타임스탬프는 단조 증가여야 한다
       let tsMs = timestampUs / 1000;
       if (tsMs <= lastTsMs) tsMs = lastTsMs + 0.001;
