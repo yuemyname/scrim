@@ -49,10 +49,15 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     } else {
       console.error('[scrim worker]', err);
       const name = err instanceof Error && err.name !== 'Error' ? `${err.name}: ` : '';
+      // 스택 상단을 함께 전달 — 원격 리포트만으로 위치를 특정할 수 있게
+      const stack =
+        err instanceof Error && err.stack
+          ? `\n${err.stack.split('\n').slice(0, 3).join('\n').slice(0, 300)}`
+          : '';
       post({
         type: 'error',
         jobId,
-        message: `${name}${err instanceof Error ? err.message : String(err)}`,
+        message: `${name}${err instanceof Error ? err.message : String(err)}${stack}`,
         unsupported: err instanceof UnsupportedSourceError,
       });
     }

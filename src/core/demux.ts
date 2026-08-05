@@ -43,7 +43,32 @@ const READ_CHUNK = 8 * 1024 * 1024;
 /** 4K(3840×2160, DCI 4096 포함)까지 받는다. 4K 소스는 렌더 시 1080p로 다운스케일된다. */
 const MAX_LONG_SIDE = 4096;
 
+/** demux 내부 하위 단계를 오류 메시지에 라벨링한다 */
+function sub(label: string, e: unknown): Error {
+  if (e instanceof Error && (e.name === 'UnsupportedSourceError' || e.name === 'AbortError')) return e;
+  const name = e instanceof Error && e.name !== 'Error' ? `${e.name}: ` : '';
+  return new Error(`(${label}) ${name}${e instanceof Error ? e.message : String(e)}`);
+}
+
+const KNOWN_TOP_BOXES = new Set(['ftyp', 'styp', 'moov', 'moof', 'free', 'skip', 'wide', 'mdat', 'pnot', 'uuid']);
+
+/** MP4(ISOBMFF)가 맞는지 첫 박스로 확인. 확장자만 .mp4인 다른 형식을 명확히 걸러낸다. */
+async function verifyContainer(file: File): Promise<void> {
+  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  if (head.length < 8) throw new UnsupportedSourceError('파일이 비어 있거나 너무 작습니다.');
+  const fourcc = String.fromCharCode(head[4] ?? 0, head[5] ?? 0, head[6] ?? 0, head[7] ?? 0);
+  if (!KNOWN_TOP_BOXES.has(fourcc)) {
+    const hex = Array.from(head.subarray(0, 4), (b) => b.toString(16).padStart(2, '0')).join(' ');
+    const hint =
+      head[0] === 0x1a && head[1] === 0x45 ? ' WebM/MKV 형식으로 보입니다.' : '';
+    throw new UnsupportedSourceError(
+      `MP4 파일이 아닌 것 같습니다 (시작 바이트: ${hex}, 타입: ${file.type || '알 수 없음'}).${hint} 확장자와 무관하게 실제 형식이 MP4여야 합니다.`,
+    );
+  }
+}
+
 export async function demux(file: File): Promise<DemuxResult> {
+  await verifyContainer(file);
   const mp4 = createFile();
 
   const videoSamples: MP4Sample[] = [];
@@ -77,8 +102,12 @@ export async function demux(file: File): Promise<DemuxResult> {
 
   let readyDone = false;
   void ready.then(() => (readyDone = true)).catch(() => (readyDone = true));
-  await feed(() => readyDone);
-  info = await ready;
+  try {
+    await feed(() => readyDone);
+    info = await ready;
+  } catch (e) {
+    throw sub('mp4 파싱', e);
+  }
 
   videoTrack = info.videoTracks[0] ?? null;
   if (!videoTrack) throw new UnsupportedSourceError('비디오 트랙이 없습니다.');
@@ -87,12 +116,16 @@ export async function demux(file: File): Promise<DemuxResult> {
   rejectUnsupported(mp4, videoTrack);
 
   // 샘플 추출 설정 후 나머지 전부 흘려 넣는다
-  mp4.setExtractionOptions(videoTrack.id, null, { nbSamples: 500 });
-  if (audioTrack) mp4.setExtractionOptions(audioTrack.id, null, { nbSamples: 1000 });
-  mp4.start();
-  await feed(() => false);
-  mp4.flush();
-  mp4.stop();
+  try {
+    mp4.setExtractionOptions(videoTrack.id, null, { nbSamples: 500 });
+    if (audioTrack) mp4.setExtractionOptions(audioTrack.id, null, { nbSamples: 1000 });
+    mp4.start();
+    await feed(() => false);
+    mp4.flush();
+    mp4.stop();
+  } catch (e) {
+    throw sub('샘플 추출', e);
+  }
 
   if (videoSamples.length === 0) throw new UnsupportedSourceError('비디오 샘플을 추출하지 못했습니다.');
 
@@ -129,21 +162,36 @@ export async function demux(file: File): Promise<DemuxResult> {
     ...(description ? { description } : {}),
   };
 
-  const toUs = (v: number, timescale: number): number => Math.round((v / timescale) * 1e6);
+  // NaN/Infinity 타임스탬프는 EncodedVideoChunk에서 TypeError를 유발한다 — 유한값 강제
+  const toUs = (v: number, timescale: number): number => {
+    const r = Math.round((v / timescale) * 1e6);
+    return Number.isFinite(r) ? r : 0;
+  };
 
-  const videoChunks = videoSamples.map(
-    (s) =>
-      new EncodedVideoChunk({
-        type: s.is_sync ? 'key' : 'delta',
-        timestamp: toUs(s.cts, s.timescale),
-        duration: toUs(s.duration, s.timescale),
-        data: s.data,
-      }),
-  );
+  let videoChunks: EncodedVideoChunk[];
+  try {
+    videoChunks = videoSamples.map(
+      (s) =>
+        new EncodedVideoChunk({
+          type: s.is_sync ? 'key' : 'delta',
+          timestamp: toUs(s.cts, s.timescale),
+          duration: toUs(s.duration, s.timescale),
+          data: s.data,
+        }),
+    );
+  } catch (e) {
+    throw sub('비디오 청크 생성', e);
+  }
 
+  // 오디오는 어떤 이유로 실패하든 영상 처리를 막지 않는다 → null 폴백 (UI 경고)
   let audio: AudioPassthrough | null = null;
   if (audioTrack && audioSamples.length > 0) {
-    audio = buildAudioPassthrough(mp4, audioTrack, audioSamples, toUs);
+    try {
+      audio = buildAudioPassthrough(mp4, audioTrack, audioSamples, toUs);
+    } catch (e) {
+      console.warn('[scrim] 오디오 추출 실패, 영상만 처리:', e);
+      audio = null;
+    }
     meta.hasAudio = audio !== null;
   }
 
@@ -190,13 +238,17 @@ function findEntry(mp4: MP4File, trackId: number, pred: (e: SampleEntry) => bool
 }
 
 function extractVideoDescription(mp4: MP4File, trackId: number): Uint8Array | null {
-  const entry = findEntry(mp4, trackId, (e) => Boolean(e.avcC || e.hvcC));
-  const box = entry?.avcC ?? entry?.hvcC;
-  if (!box) return null;
-  const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
-  box.write(stream);
-  // 앞 8바이트(box header: size + fourcc)를 제거한 본문이 description이다
-  return new Uint8Array(stream.buffer, 8);
+  try {
+    const entry = findEntry(mp4, trackId, (e) => Boolean(e.avcC || e.hvcC));
+    const box = entry?.avcC ?? entry?.hvcC;
+    if (!box) return null;
+    const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
+    box.write(stream);
+    // 앞 8바이트(box header: size + fourcc)를 제거한 본문이 description이다
+    return new Uint8Array(stream.buffer, 8);
+  } catch {
+    return null;
+  }
 }
 
 /** mp4 tkhd matrix에서 회전각을 유도한다. 무시하면 세로 촬영 영상의 좌표가 90도 틀어진다. */

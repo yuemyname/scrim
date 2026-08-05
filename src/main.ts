@@ -182,7 +182,15 @@ class App {
       } else {
         const msg = e instanceof Error ? e.message : String(e);
         openModal((modal, close) => {
-          modal.innerHTML = `<h3>영상을 열 수 없습니다</h3><p>${msg}</p>`;
+          const h = document.createElement('h3');
+          h.textContent = '영상을 열 수 없습니다';
+          const p = document.createElement('p');
+          p.textContent = msg;
+          p.style.whiteSpace = 'pre-wrap';
+          p.style.wordBreak = 'break-all';
+          p.className = 'mono';
+          p.style.fontSize = '11px';
+          modal.append(h, p);
           const actions = document.createElement('div');
           actions.className = 'actions';
           const ok = document.createElement('button');
@@ -396,6 +404,7 @@ class App {
 
     const options: { label: string; value: number | null }[] = [];
     options.push({ label: `원본 — ${dims(null)}`, value: null });
+    if (maxSide > 2560) options.push({ label: `1440p — ${dims(2560)}`, value: 2560 });
     if (maxSide > 1920) options.push({ label: `1080p — ${dims(1920)}`, value: 1920 });
     if (maxSide > 1280) options.push({ label: `720p — ${dims(1280)}`, value: 1280 });
 
