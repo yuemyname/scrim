@@ -6,10 +6,17 @@
  * 사용자 미디어는 파일 객체로만 다뤄져 네트워크를 타지 않는다.
  *
  * 전략:
- *  - /assets/(해시 파일명), /models/(?v= 버전 쿼리) → cache-first (불변 자산)
+ *  - /assets/(해시 파일명), ?v= 버전 쿼리가 붙은 자산(models·파비콘) → cache-first
  *  - 그 외(index.html, manifest 등) → network-first, 오프라인이면 캐시 폴백
+ *
+ * network-first는 반드시 HTTP 캐시를 우회해야 한다. GitHub Pages가 HTML에
+ * max-age를 붙이기 때문에 그냥 fetch하면 배포 후에도 브라우저가 옛 index.html을
+ * 돌려주고, 그러면 새 해시 자산(JS/CSS)을 아예 참조하지 못해 앱이 갱신되지 않는다.
+ *
+ * CACHE 이름을 올리면 activate에서 옛 캐시를 전부 지운다 — 캐시 전략을 바꿀 때
+ * 반드시 함께 올릴 것.
  */
-const CACHE = 'scrim-runtime-v1';
+const CACHE = 'scrim-runtime-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -31,7 +38,11 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  const immutable = url.pathname.includes('/assets/') || url.pathname.includes('/models/');
+  // ?v=<빌드 ID>가 붙은 고정 경로 자산(파비콘·매니페스트·모델)은 불변으로 다룬다
+  const immutable =
+    url.pathname.includes('/assets/') ||
+    url.pathname.includes('/models/') ||
+    url.searchParams.has('v');
   e.respondWith(immutable ? cacheFirst(req, url) : networkFirst(req));
 });
 
@@ -59,7 +70,9 @@ async function cacheFirst(req, url) {
 async function networkFirst(req) {
   const c = await caches.open(CACHE);
   try {
-    const res = await fetch(req);
+    // cache: 'no-store'로 HTTP 캐시를 건너뛴다. 같은 오리진 GET만 오므로
+    // URL로 다시 요청해도 안전하다 (navigate 요청은 Request 복제가 까다롭다).
+    const res = await fetch(req.url, { cache: 'no-store', credentials: 'same-origin' });
     if (res.ok) await c.put(req, res.clone());
     return res;
   } catch (err) {

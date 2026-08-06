@@ -749,7 +749,11 @@ if (!featureSupported()) {
 // PWA 오프라인 지원: 같은 오리진 자산만 캐시하는 서비스 워커 (public/sw.js).
 // 네트워크로 데이터를 보내지 않는다 — 자산 캐시·재검증뿐이다.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
-    /* SW 실패는 앱 동작에 영향 없음 (오프라인 지원만 빠진다) */
-  });
+  // updateViaCache: 'none' — sw.js 자체를 HTTP 캐시에서 읽지 않는다.
+  // 이게 없으면 배포해도 브라우저가 옛 sw.js를 붙들고 있어 갱신이 늦어진다.
+  void navigator.serviceWorker
+    .register(`${import.meta.env.BASE_URL}sw.js`, { updateViaCache: 'none' })
+    .catch(() => {
+      /* SW 실패는 앱 동작에 영향 없음 (오프라인 지원만 빠진다) */
+    });
 }

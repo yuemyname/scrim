@@ -14,14 +14,14 @@
          Safari는 SVG 파비콘을 지원하지 않으므로 .ico/PNG를 먼저 두고,
          SVG는 지원 브라우저가 알아서 우선 사용하도록 마지막에 둔다.
          아이콘 원본은 icon.svg이며 래스터는 scripts/gen-icons.py로 생성한다. -->
-    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" href="/favicon.ico?v=__BUILD_ID__" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=__BUILD_ID__" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=__BUILD_ID__" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png?v=__BUILD_ID__" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg?v=__BUILD_ID__" />
     <!-- iPad 홈 화면 추가용 (PWA) -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest?v=__BUILD_ID__" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=__BUILD_ID__" />
     <meta name="apple-mobile-web-app-title" content="scrim" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
