@@ -88,6 +88,16 @@ button.primary {
   font-variant-numeric: tabular-nums;
 }
 
+/* 이모지는 반드시 컬러 이모지 폰트로 렌더링한다.
+   기본 폰트가 모노스페이스(Menlo/DejaVu 계열)라 ☕ 같은 문자는 그 폰트 안의
+   흑백 글리프가 먼저 선택돼 애플 컬러 이모지로 폴백되지 않는다 — 이모지만
+   이 클래스로 분리해 폰트를 강제한다 (DESIGN.md §8 후원 버튼 예외). */
+.emoji {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-variant-emoji: emoji;
+  line-height: 1;
+}
+
 /* LCD 칩 — 수치·상태 표시. 버튼과 같은 라인 높이 */
 .lcd {
   background: var(--lcd-bg);
@@ -368,6 +378,13 @@ select {
 .sticker-presets button {
   padding: 0 8px;
   font-size: 16px;
+}
+/* 이모지 버튼도 다른 컨트롤과 같은 높이·정렬 유지 (.emoji가 폰트만 바꾼다) */
+button.emoji {
+  height: var(--ctrl-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .style-panel input[type='range'] {
   flex: 1;

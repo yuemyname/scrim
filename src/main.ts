@@ -78,7 +78,16 @@ function buildTopbar(onOpen: (() => void) | null, onLangChange?: () => void): HT
   // 앱의 어떤 데이터도 함께 보내지 않는다.
   if (SUPPORT_URL) {
     const supportBtn = document.createElement('button');
-    supportBtn.textContent = t('support');
+    // '☕ coffee' — 이모지는 별도 span(.emoji)으로 분리해야 컬러로 렌더링된다.
+    // 버튼 기본 폰트가 모노스페이스라 그냥 넣으면 흑백 글리프가 잡힌다.
+    const [emojiPart, ...labelParts] = t('support').split(' ');
+    const emojiEl = document.createElement('span');
+    emojiEl.className = 'emoji';
+    emojiEl.textContent = `${emojiPart ?? ''}️`; // VS16: 이모지 프레젠테이션 요청
+    const labelEl = document.createElement('span');
+    labelEl.textContent = labelParts.join(' ');
+    supportBtn.append(emojiEl, labelEl);
+    supportBtn.style.gap = '6px';
     supportBtn.title = t('supportTip');
     supportBtn.addEventListener('click', () => window.open(SUPPORT_URL, '_blank', 'noopener'));
     bar.appendChild(supportBtn);

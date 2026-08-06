@@ -302,6 +302,8 @@ export class Sidebar {
       presets.className = 'row sticker-presets';
       for (const e of ['🙂', '😎', '🐻', '⭐️', '🌸', '🫥']) {
         const b = document.createElement('button');
+        // 이모지 프리셋도 컬러로 — 모노스페이스 폰트의 흑백 글리프를 피한다
+        b.className = 'emoji';
         b.textContent = e;
         b.addEventListener('click', () => commit((s) => (s.sticker = e)));
         presets.appendChild(b);
