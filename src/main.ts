@@ -393,6 +393,25 @@ class App {
       else toast(t('nothingToRedo'));
     });
 
+    // 확대/축소 — 영상·사진 공통. 배율 칩을 누르면 화면 맞춤으로 복귀
+    const zoomOut = document.createElement('button');
+    zoomOut.textContent = '−';
+    zoomOut.title = t('zoomOut');
+    zoomOut.addEventListener('click', () => player.zoomBy(1 / 1.4));
+    const zoomChip = document.createElement('button');
+    zoomChip.className = 'lcd zoom-chip mono';
+    zoomChip.textContent = '100%';
+    zoomChip.title = t('zoomTip');
+    zoomChip.addEventListener('click', () => player.resetZoom());
+    const zoomIn = document.createElement('button');
+    zoomIn.textContent = '+';
+    zoomIn.title = t('zoomIn');
+    zoomIn.addEventListener('click', () => player.zoomBy(1.4));
+    player.onZoomChange = (z) => {
+      zoomChip.textContent = `${Math.round(z * 100)}%`;
+      zoomChip.classList.toggle('on', z !== 1);
+    };
+
     const cutBtn = document.createElement('button');
     cutBtn.textContent = t('cutMark');
     cutBtn.title = t('cutTip');
@@ -422,10 +441,14 @@ class App {
     topRight.append(hazardCount, exportBtn);
     topbar.appendChild(topRight);
 
+    const zoomGroup = document.createElement('div');
+    zoomGroup.className = 'zoom-group';
+    zoomGroup.append(zoomOut, zoomChip, zoomIn);
+
     if (state.isImage) {
-      transport.append(undoBtn, redoBtn, spacer);
+      transport.append(undoBtn, redoBtn, zoomGroup, spacer);
     } else {
-      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, trackBtn, cutBtn, spacer);
+      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, trackBtn, cutBtn, zoomGroup, spacer);
     }
 
     const timeline = new Timeline(state);

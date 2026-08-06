@@ -7,6 +7,10 @@
  *   드래그 → 항상 새 수동 트랙 생성 (기존 가림 위에서도 — 겹침 레이어 자동)
  *   단, "선택된" 박스 안에서 드래그하면 이동, 모서리는 크기 조절.
  * 조작할 때마다 현재 시각에 'manual' 키프레임이 추가되고 사이는 선형 보간된다.
+ *
+ * 확대/축소: 두 손가락 핀치·이동(한 손가락은 편집용으로 남긴다), 휠(데스크톱),
+ * 버튼. CSS transform으로 화면만 키우므로 좌표 변환은 그대로 유지된다
+ * (모든 히트 테스트가 getBoundingClientRect 기준이라 변환 후 값이 자동 반영).
  */
 import type { Box, RedactStyle, Track } from '../types';
 import { sampleTrackAt } from '../core/track';
@@ -35,6 +39,17 @@ export class Player {
   private drag: DragMode | null = null;
   private rafPending = false;
   private videoUrl: string | null = null;
+
+  // ── 확대/축소 상태 ──
+  private zoom = 1;
+  private panX = 0;
+  private panY = 0;
+  /** 활성 포인터 (두 개면 핀치) */
+  private pointers = new Map<number, { x: number; y: number }>();
+  private pinch: { dist: number; zoom: number } | null = null;
+  private pinchCx: number | null = null;
+  private pinchCy: number | null = null;
+  onZoomChange: ((zoom: number) => void) | null = null;
 
   constructor(state: AppState) {
     this.state = state;
@@ -133,6 +148,66 @@ export class Player {
     const scale = Math.min(aw / vw, ah / vh);
     this.root.style.width = `${Math.max(1, Math.floor(vw * scale))}px`;
     this.root.style.height = `${Math.max(1, Math.floor(vh * scale))}px`;
+    this.applyTransform(); // 크기가 바뀌면 팬 범위도 달라진다
+  }
+
+  // ── 확대/축소 ────────────────────────────────────
+  //
+  // transform-origin을 (0,0)으로 두고 translate+scale을 직접 관리한다.
+  // 팬 범위는 "확대된 내용이 원래 박스를 항상 덮도록" 클램프한다.
+
+  private applyTransform(): void {
+    const w = this.root.offsetWidth;
+    const h = this.root.offsetHeight;
+    const maxX = 0;
+    const minX = -(this.zoom - 1) * w;
+    const maxY = 0;
+    const minY = -(this.zoom - 1) * h;
+    this.panX = Math.min(maxX, Math.max(minX, this.panX));
+    this.panY = Math.min(maxY, Math.max(minY, this.panY));
+    this.root.style.transformOrigin = '0 0';
+    this.root.style.transform =
+      this.zoom === 1 ? '' : `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
+    // 삭제 버튼은 확대돼도 같은 크기로 보이게 역스케일
+    this.deleteBtn.style.transform = this.zoom === 1 ? '' : `scale(${1 / this.zoom})`;
+    this.deleteBtn.style.transformOrigin = '0 0';
+    this.requestDraw();
+  }
+
+  get zoomLevel(): number {
+    return this.zoom;
+  }
+
+  /** 화면 좌표(clientX/Y)를 고정점으로 배율 변경. 고정점 없으면 중앙 기준 */
+  setZoom(next: number, anchorClient?: { x: number; y: number }): void {
+    const stage = this.root.parentElement;
+    if (!stage) return;
+    const target = Math.min(8, Math.max(1, next));
+    if (target === this.zoom) return;
+    const stageRect = stage.getBoundingClientRect();
+    const ax = (anchorClient?.x ?? stageRect.left + stageRect.width / 2) - stageRect.left;
+    const ay = (anchorClient?.y ?? stageRect.top + stageRect.height / 2) - stageRect.top;
+    // 고정점의 요소-로컬 좌표(변환 전)를 유지하도록 팬을 다시 계산
+    const lx = (ax - this.root.offsetLeft - this.panX) / this.zoom;
+    const ly = (ay - this.root.offsetTop - this.panY) / this.zoom;
+    this.zoom = target;
+    this.panX = ax - this.root.offsetLeft - lx * target;
+    this.panY = ay - this.root.offsetTop - ly * target;
+    this.applyTransform();
+    this.onZoomChange?.(this.zoom);
+  }
+
+  zoomBy(factor: number): void {
+    this.setZoom(this.zoom * factor);
+  }
+
+  /** 화면 맞춤으로 복귀 */
+  resetZoom(): void {
+    this.zoom = 1;
+    this.panX = 0;
+    this.panY = 0;
+    this.applyTransform();
+    this.onZoomChange?.(this.zoom);
   }
 
   /** 사진 모드: 비디오 대신 이미지를 표시하고 단일 프레임으로 동작한다 */
@@ -259,6 +334,9 @@ export class Player {
       metaLike,
     );
 
+    // 보더·핸들은 "화면 기준" 두께로 그린다 — 확대해도 굵어지지 않게
+    const k = this.canvasPerScreenPx();
+
     // 모든 박스에 트랙별 색 보더 — 같은 프레임의 여러 박스를 구분할 수 있게.
     // 보더는 눈에 보이는 가림 영역(스타일 확대 적용)을 따라 그린다.
     const sel = this.state.selectedTrack();
@@ -266,8 +344,8 @@ export class Player {
       if (track.id === sel?.id) continue; // 선택 트랙은 아래에서 강조 표시
       const vis = scaleBox(box, style.scale);
       this.ctx.strokeStyle = trackColor(track.id);
-      this.ctx.lineWidth = 1.5;
-      this.ctx.setLineDash([6, 4]);
+      this.ctx.lineWidth = 1.5 * k;
+      this.ctx.setLineDash([6 * k, 4 * k]);
       this.ctx.strokeRect(vis.x * W, vis.y * H, vis.w * W, vis.h * H);
       this.ctx.setLineDash([]);
     }
@@ -284,17 +362,18 @@ export class Player {
         const w = box.w * W;
         const h = box.h * H;
         this.ctx.strokeStyle = color;
-        this.ctx.lineWidth = 3;
+        this.ctx.lineWidth = 2.5 * k;
         this.ctx.strokeRect(x, y, w, h);
         // 자동/수동 구분 없이 선택된 트랙은 편집 가능 — 모서리 핸들 표시
         this.ctx.fillStyle = color;
+        const hp = HANDLE_PX * k;
         for (const [cx, cy] of [
           [x, y],
           [x + w, y],
           [x, y + h],
           [x + w, y + h],
         ] as const) {
-          this.ctx.fillRect(cx - 5, cy - 5, 10, 10);
+          this.ctx.fillRect(cx - hp / 2, cy - hp / 2, hp, hp);
         }
       }
     }
@@ -303,11 +382,18 @@ export class Player {
     if (this.drag?.kind === 'create') {
       const b = this.drag.box;
       this.ctx.strokeStyle = '#FFFFFF';
-      this.ctx.lineWidth = 1.5;
-      this.ctx.setLineDash([6, 4]);
+      this.ctx.lineWidth = 1.5 * k;
+      this.ctx.setLineDash([6 * k, 4 * k]);
       this.ctx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
       this.ctx.setLineDash([]);
     }
+  }
+
+  /** 캔버스 픽셀 / 화면 픽셀 비율 — 확대 배율과 표시 축소를 모두 반영한다 */
+  private canvasPerScreenPx(): number {
+    const rect = this.overlay.getBoundingClientRect();
+    if (rect.width <= 0) return 1;
+    return this.overlay.width / rect.width;
   }
 
   /** 선택된 트랙 삭제 (터치 환경에서 Delete 키 대체) */
@@ -323,12 +409,17 @@ export class Player {
   }
 
   private positionDeleteButton(box: Box): void {
-    const rect = this.overlay.getBoundingClientRect();
-    if (rect.width === 0) return;
-    const rightPx = Math.min(rect.width - 4, (box.x + box.w) * rect.width + 6);
-    const topPx = Math.max(4, box.y * rect.height - 30);
+    // 버튼은 변환된 요소 "안"에 배치되므로 좌표는 변환 전 레이아웃 크기 기준이다
+    const w = this.overlay.offsetWidth;
+    const h = this.overlay.offsetHeight;
+    if (w === 0) return;
+    const gap = 6 / this.zoom;
+    const btnW = 70 / this.zoom;
+    const btnH = 30 / this.zoom;
+    const rightPx = Math.min(w - 4, (box.x + box.w) * w + gap);
+    const topPx = Math.max(4, box.y * h - btnH);
     this.deleteBtn.style.display = 'block';
-    this.deleteBtn.style.left = `${Math.max(4, Math.min(rect.width - 70, rightPx))}px`;
+    this.deleteBtn.style.left = `${Math.max(4, Math.min(w - btnW, rightPx))}px`;
     this.deleteBtn.style.top = `${topPx}px`;
   }
 
@@ -351,11 +442,47 @@ export class Player {
     };
   }
 
+  /** 두 포인터 사이 거리·중점 */
+  private pinchGeom(): { dist: number; cx: number; cy: number } | null {
+    const [a, b] = [...this.pointers.values()];
+    if (!a || !b) return null;
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+  }
+
   private bindPointer(): void {
+    // 데스크톱: 휠(트랙패드 핀치 포함)로 확대. 페이지 스크롤은 막는다.
+    this.overlay.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const factor = Math.exp(-e.deltaY * 0.002);
+        this.setZoom(this.zoom * factor, { x: e.clientX, y: e.clientY });
+      },
+      { passive: false },
+    );
+
     this.overlay.addEventListener('pointerdown', (e) => {
       const project = this.state.project;
       if (!project) return;
-      this.overlay.setPointerCapture(e.pointerId);
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // 두 번째 손가락 → 핀치 확대/이동 시작. 진행 중이던 편집은 취소한다.
+      if (this.pointers.size === 2) {
+        const g = this.pinchGeom();
+        if (g) {
+          this.drag = null;
+          this.pinch = { dist: g.dist, zoom: this.zoom };
+          this.requestDraw();
+        }
+        return;
+      }
+      if (this.pointers.size > 2) return;
+
+      try {
+        this.overlay.setPointerCapture(e.pointerId);
+      } catch {
+        /* 일부 환경에서 캡처가 거부될 수 있다 — 캡처 없이도 동작한다 */
+      }
       const p = this.toNorm(e);
       const t = this.state.currentUs;
       const rect = this.overlay.getBoundingClientRect();
@@ -409,6 +536,25 @@ export class Player {
     });
 
     this.overlay.addEventListener('pointermove', (e) => {
+      if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // 핀치: 배율은 두 손가락 거리, 이동은 중점 이동량
+      if (this.pinch) {
+        const g = this.pinchGeom();
+        if (!g || g.dist <= 0) return;
+        const prevCx = this.pinchCx;
+        const prevCy = this.pinchCy;
+        this.pinchCx = g.cx;
+        this.pinchCy = g.cy;
+        if (prevCx !== null && prevCy !== null) {
+          this.panX += g.cx - prevCx;
+          this.panY += g.cy - prevCy;
+        }
+        this.setZoom((this.pinch.zoom * g.dist) / this.pinch.dist, { x: g.cx, y: g.cy });
+        this.applyTransform();
+        return;
+      }
+
       if (!this.drag) return;
       const p = this.toNorm(e);
       const t = this.state.currentUs;
@@ -448,6 +594,15 @@ export class Player {
       }
     });
 
+    const endPointer = (e: PointerEvent): void => {
+      this.pointers.delete(e.pointerId);
+      if (this.pinch && this.pointers.size < 2) {
+        this.pinch = null;
+        this.pinchCx = null;
+        this.pinchCy = null;
+      }
+    };
+
     const finish = (): void => {
       if (!this.drag) return;
       if (this.drag.kind === 'create') {
@@ -471,8 +626,14 @@ export class Player {
         this.drag = null;
       }
     };
-    this.overlay.addEventListener('pointerup', finish);
-    this.overlay.addEventListener('pointercancel', finish);
+    this.overlay.addEventListener('pointerup', (e) => {
+      endPointer(e);
+      finish();
+    });
+    this.overlay.addEventListener('pointercancel', (e) => {
+      endPointer(e);
+      finish();
+    });
   }
 
   private createManualTrack(box: Box): void {

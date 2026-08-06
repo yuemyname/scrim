@@ -1,8 +1,8 @@
 /** 앱 표시명. 프로젝트명은 package.json의 name과 이 상수만 참조한다. */
 export const APP_NAME = 'scrim';
 
-/** 후원 페이지 링크 (Buy Me a Coffee, 토스 후원 등).
- *  빈 문자열이면 후원 버튼이 표시되지 않는다 — 계정을 만든 뒤 여기에 URL을 넣을 것. */
+/** 후원 페이지 링크 (Buy Me a Coffee 등).
+ *  빈 문자열이면 후원 버튼이 표시되지 않는다. */
 export const SUPPORT_URL = 'https://buymeacoffee.com/yuemyname';
 
 /** 정규화 좌표 (0..1). 소스 해상도 변경에 독립적이어야 한다.

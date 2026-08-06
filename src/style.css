@@ -428,6 +428,24 @@ select {
 .transport .spacer {
   flex: 1;
 }
+/* 확대/축소 그룹 — 배율은 LCD 칩, 확대 중이면 반전으로 상태 표시 */
+.zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.zoom-group button {
+  min-width: 32px;
+}
+.zoom-group .zoom-chip {
+  border: 1px solid var(--accent);
+  min-width: 56px;
+}
+.zoom-group .zoom-chip.on {
+  background: var(--signal-blue);
+  border-color: var(--signal-blue);
+  color: #fff;
+}
 /* 미검증 카운터: LCD 칩 + 1s 스텝 점멸(경고). 해소되면 dim 텍스트 */
 .hazard-count {
   background: var(--lcd-bg);

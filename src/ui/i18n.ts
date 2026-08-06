@@ -86,6 +86,13 @@ const M = {
   nothingToUndo: { ko: '되돌릴 작업이 없습니다', en: 'Nothing to undo' },
   redone: { ko: '다시 실행했습니다', en: 'Redone' },
   nothingToRedo: { ko: '다시 실행할 작업이 없습니다', en: 'Nothing to redo' },
+  zoomIn: { ko: '확대', en: 'Zoom in' },
+  zoomOut: { ko: '축소', en: 'Zoom out' },
+  zoomFit: { ko: '화면 맞춤', en: 'Fit to screen' },
+  zoomTip: {
+    ko: '두 손가락으로 확대·이동할 수 있습니다. 배율을 누르면 화면 맞춤으로 돌아갑니다',
+    en: 'Pinch with two fingers to zoom and pan. Tap the level to fit.',
+  },
   trackFace: { ko: '얼굴 추적', en: 'Track face' },
   trackFaceTip: {
     ko: '선택한 수동 박스의 대상을 구간 동안 자동으로 따라갑니다',
