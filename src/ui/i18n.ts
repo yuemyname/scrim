@@ -33,9 +33,11 @@ export function setLang(next: Lang): void {
 
 const M = {
   open: { ko: '영상·사진 열기', en: 'Open video/photo' },
-  // ︎(VS15)는 컬러 이모지 대신 흑백 글리프를 강제한다 — DESIGN.md §8.
-  // 편집기에서 사라지기 쉬운 보이지 않는 문자라 이스케이프로 적는다.
-  support: { ko: '☕\uFE0E 후원', en: '☕\uFE0E Support' },
+  // 컬러 이모지 그대로 노출한다 (VS15로 흑백화하지 않음) — DESIGN.md §8
+  // 이모지 규칙의 확정된 예외. U+2615는 기본이 이모지 프레젠테이션이라
+  // 변이 선택자 없이도 애플 커피 이모지로 렌더링된다.
+  // 라벨은 두 언어 모두 'coffee'로 통일한다.
+  support: { ko: '☕ coffee', en: '☕ coffee' },
   supportTip: {
     ko: '이 도구가 도움이 됐다면 제작자를 후원해 주세요 (새 창)',
     en: 'If this tool helped you, consider supporting the developer (opens new tab)',
