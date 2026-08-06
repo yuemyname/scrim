@@ -39,9 +39,35 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+      # Pages는 동시에 배포 하나만 허용한다. 앞선 실행이 취소되거나 중단되면 그
+      # 배포가 'in progress'로 남아, 이후 모든 배포가 400으로 거부된다:
+      #   Deployment request failed ... due to in progress deployment.
+      #   Please cancel <sha> first or wait for it to complete.
+      # 이 상태는 저절로 풀리지 않아 배포가 영구히 막히므로, 배포 직전에 남아 있는
+      # 배포를 정리한다. concurrency(cancel-in-progress: false)로 실행이 직렬화되니
+      # 여기서 보이는 미완 배포는 정상 진행 중인 것이 아니라 끊긴 잔여물이다.
+      - name: Clear stuck Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          api() { curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                          -H "Accept: application/vnd.github+json" "$@"; }
+          for sha in $(api "https://api.github.com/repos/$REPO/deployments?environment=github-pages&per_page=10" \
+                        | jq -r '.[].sha' | sort -u); do
+            [ "$sha" = "$GITHUB_SHA" ] && continue
+            status=$(api "https://api.github.com/repos/$REPO/pages/deployments/$sha" | jq -r '.status // empty')
+            case "$status" in
+              in_progress|queued|pending|building)
+                echo "정리: 미완 Pages 배포 $sha (status=$status)"
+                api -X POST "https://api.github.com/repos/$REPO/pages/deployments/$sha/cancel" >/dev/null
+                ;;
+            esac
+          done
+
       - id: deployment
         uses: actions/deploy-pages@v4
         with:
-          # Pages 배포 큐가 밀리면 기본 10분으로는 부족할 때가 있다 (빌드는 이미
-          # 끝났고 GitHub 쪽 처리만 남은 상태라 더 기다리는 편이 낫다)
-          timeout: 1200000
+          # deploy-pages의 상한은 600000ms다 — 더 큰 값을 주면 잘리면서 경고만 남는다
+          timeout: 600000
