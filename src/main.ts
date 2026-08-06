@@ -2,7 +2,7 @@
  * scrim 엔트리. 기능 감지 → 랜딩 → 분석 → 리뷰 → 내보내기.
  * 미지원 브라우저에는 처리 UI를 띄우지 않고 안내 화면만 표시한다 (반쪽 폴백 금지).
  */
-import { APP_NAME } from './types';
+import { APP_NAME, SUPPORT_URL } from './types';
 import { AppState } from './ui/state';
 import { Player } from './ui/player';
 import { Timeline } from './ui/timeline';
@@ -72,6 +72,16 @@ function buildTopbar(onOpen: (() => void) | null, onLangChange?: () => void): HT
       onLangChange();
     });
     bar.appendChild(langBtn);
+  }
+
+  // 후원 버튼 — SUPPORT_URL이 설정된 경우에만 표시. 링크 이동만 하며
+  // 앱의 어떤 데이터도 함께 보내지 않는다.
+  if (SUPPORT_URL) {
+    const supportBtn = document.createElement('button');
+    supportBtn.textContent = t('support');
+    supportBtn.title = t('supportTip');
+    supportBtn.addEventListener('click', () => window.open(SUPPORT_URL, '_blank', 'noopener'));
+    bar.appendChild(supportBtn);
   }
 
   if (onOpen) {
@@ -734,4 +744,12 @@ if (!featureSupported()) {
   renderUnsupported(app);
 } else {
   new App(app);
+}
+
+// PWA 오프라인 지원: 같은 오리진 자산만 캐시하는 서비스 워커 (public/sw.js).
+// 네트워크로 데이터를 보내지 않는다 — 자산 캐시·재검증뿐이다.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+    /* SW 실패는 앱 동작에 영향 없음 (오프라인 지원만 빠진다) */
+  });
 }

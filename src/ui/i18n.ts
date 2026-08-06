@@ -33,6 +33,11 @@ export function setLang(next: Lang): void {
 
 const M = {
   open: { ko: '영상·사진 열기', en: 'Open video/photo' },
+  support: { ko: '후원', en: 'Support' },
+  supportTip: {
+    ko: '이 도구가 도움이 됐다면 제작자를 후원해 주세요 (새 창)',
+    en: 'If this tool helped you, consider supporting the developer (opens new tab)',
+  },
   saveWork: { ko: '작업 내역 저장', en: 'Save work' },
   saveWorkTip: {
     ko: '가림 박스·스타일 등 편집 내역만 저장합니다. 영상 파일은 포함되지 않습니다.',

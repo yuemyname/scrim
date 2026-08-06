@@ -1,0 +1,17 @@
+{
+  "name": "scrim — 영상·사진 얼굴 비식별화",
+  "short_name": "scrim",
+  "description": "브라우저 안에서만 동작하는 영상·사진 얼굴 비식별화 도구. 업로드 없음, 서버 없음.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f4f2",
+  "theme_color": "#f4f4f2",
+  "icons": [
+    { "src": "favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
