@@ -52,18 +52,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
+          # 상태 조회로 거르지 않고 무조건 취소를 시도한다 — 이미 끝난 배포에 대한
+          # 취소는 4xx로 무시되며, 상태 필드에 기대면 (조회 실패·값 불일치로)
+          # 정작 잠금을 쥔 배포를 건너뛴다.
           api() { curl -sS -H "Authorization: Bearer $GH_TOKEN" \
                           -H "Accept: application/vnd.github+json" "$@"; }
-          for sha in $(api "https://api.github.com/repos/$REPO/deployments?environment=github-pages&per_page=10" \
-                        | jq -r '.[].sha' | sort -u); do
-            [ "$sha" = "$GITHUB_SHA" ] && continue
-            status=$(api "https://api.github.com/repos/$REPO/pages/deployments/$sha" | jq -r '.status // empty')
-            case "$status" in
-              in_progress|queued|pending|building)
-                echo "정리: 미완 Pages 배포 $sha (status=$status)"
-                api -X POST "https://api.github.com/repos/$REPO/pages/deployments/$sha/cancel" >/dev/null
-                ;;
-            esac
+          shas=$(api "https://api.github.com/repos/$REPO/deployments?environment=github-pages&per_page=20" \
+                  | jq -r '.[].sha' | grep -v "^$GITHUB_SHA$" | sort -u || true)
+          if [ -z "$shas" ]; then echo "이전 Pages 배포 없음"; fi
+          for sha in $shas; do
+            code=$(curl -sS -o /tmp/cancel.out -w '%{http_code}' -X POST \
+                    -H "Authorization: Bearer $GH_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/$REPO/pages/deployments/$sha/cancel" || echo "000")
+            echo "cancel $sha → HTTP $code $(head -c 200 /tmp/cancel.out)"
           done
 
       - id: deployment
