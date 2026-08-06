@@ -375,15 +375,6 @@ class App {
       else toast(t('nothingToRedo'));
     });
 
-    const addBoxBtn = document.createElement('button');
-    addBoxBtn.textContent = t('addBox');
-    addBoxBtn.title = t('addBoxTip');
-    addBoxBtn.addEventListener('click', () => player.setAddBoxMode(!player.addBoxMode));
-    player.onAddBoxModeChange = (on) => {
-      addBoxBtn.classList.toggle('on', on);
-      if (on) toast(t('addBoxHint'));
-    };
-
     const cutBtn = document.createElement('button');
     cutBtn.textContent = t('cutMark');
     cutBtn.title = t('cutTip');
@@ -414,9 +405,9 @@ class App {
     topbar.appendChild(topRight);
 
     if (state.isImage) {
-      transport.append(undoBtn, redoBtn, addBoxBtn, spacer);
+      transport.append(undoBtn, redoBtn, spacer);
     } else {
-      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, addBoxBtn, trackBtn, cutBtn, spacer);
+      transport.append(stepBack, playBtn, stepFwd, time, undoBtn, redoBtn, trackBtn, cutBtn, spacer);
     }
 
     const timeline = new Timeline(state);
@@ -467,9 +458,6 @@ class App {
       } else if ((e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         this.toggleCut();
-      } else if ((e.key === 'b' || e.key === 'B') && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        player.setAddBoxMode(!player.addBoxMode);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         const project = this.state.project;
         const checked = this.state.checkedTracks();

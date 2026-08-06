@@ -2,9 +2,11 @@
  * 플레이어: 원본 <video> 재생 + 오버레이 캔버스에 레닥션 합성.
  * 미리보기는 인코딩하지 않는다 — 원본 재생 위에 실시간 합성이다.
  *
- * 수동 박스: 빈 곳 드래그 → 새 수동 트랙(기본 1초).
- * 선택된 수동 트랙은 드래그로 이동, 모서리로 크기 조절 — 조작할 때마다
- * 현재 시각에 'manual' 키프레임이 추가되고 사이는 선형 보간된다.
+ * 수동 박스 인터랙션 (모드 없음):
+ *   탭 → 박스 선택 / 빈 곳 탭 → 선택 해제
+ *   드래그 → 항상 새 수동 트랙 생성 (기존 가림 위에서도 — 겹침 레이어 자동)
+ *   단, "선택된" 박스 안에서 드래그하면 이동, 모서리는 크기 조절.
+ * 조작할 때마다 현재 시각에 'manual' 키프레임이 추가되고 사이는 선형 보간된다.
  */
 import type { Box, RedactStyle, Track } from '../types';
 import { sampleTrackAt } from '../core/track';
@@ -17,7 +19,7 @@ const HANDLE_PX = 10;
 const DEFAULT_MANUAL_DURATION_US = 1_000_000;
 
 type DragMode =
-  | { kind: 'create'; startX: number; startY: number; box: Box }
+  | { kind: 'create'; startX: number; startY: number; box: Box; hitTrackId: string | null }
   | { kind: 'move'; track: Track; grabDX: number; grabDY: number }
   | { kind: 'resize'; track: Track; corner: 'nw' | 'ne' | 'sw' | 'se'; anchor: { x: number; y: number } };
 
@@ -33,14 +35,6 @@ export class Player {
   private drag: DragMode | null = null;
   private rafPending = false;
   private videoUrl: string | null = null;
-  /** 박스 추가 모드: 기존 트랙 위에서도 항상 새 박스를 그린다 (겹치는 레이어 생성용) */
-  addBoxMode = false;
-  onAddBoxModeChange: ((on: boolean) => void) | null = null;
-
-  setAddBoxMode(on: boolean): void {
-    this.addBoxMode = on;
-    this.onAddBoxModeChange?.(on);
-  }
 
   constructor(state: AppState) {
     this.state = state;
@@ -353,12 +347,6 @@ export class Player {
       const handleNX = HANDLE_PX / rect.width;
       const handleNY = HANDLE_PX / rect.height;
 
-      // 박스 추가 모드: 아래에 무엇이 있든 새 박스 생성으로 직행 (겹침 레이어)
-      if (this.addBoxMode) {
-        this.drag = { kind: 'create', startX: p.x, startY: p.y, box: { x: p.x, y: p.y, w: 0, h: 0 } };
-        return;
-      }
-
       // 1) 선택된 트랙의 모서리 → resize (자동 트랙도 편집 가능 — 'manual' 키프레임이 얹힌다)
       const sel = this.state.selectedTrack();
       if (sel) {
@@ -380,24 +368,29 @@ export class Player {
         }
       }
 
-      // 2) 트랙 내부 → 선택 + move (수동 우선, 이어서 자동).
-      //    판정은 눈에 보이는 가림 영역(확대 적용) 기준.
-      const ordered = [...project.tracks].sort((a, b) => (a.origin === 'manual' ? -1 : 1) - (b.origin === 'manual' ? -1 : 1));
-      for (const track of ordered) {
-        if (!track.enabled) continue;
-        if (this.hitBox(track, p, t)) {
-          const box = sampleTrackAt(track, t);
-          if (!box) continue;
-          this.state.selectedTrackId = track.id;
-          this.state.emit('selection');
+      // 2) "선택된" 트랙 내부 → move. 선택되지 않은 박스 위 드래그는 이동이 아니라
+      //    새 박스 생성이다 — 겹침 레이어를 모드 전환 없이 쌓을 수 있게.
+      if (sel && this.hitBox(sel, p, t)) {
+        const box = sampleTrackAt(sel, t);
+        if (box) {
           this.state.pushUndo();
-          this.drag = { kind: 'move', track, grabDX: p.x - box.x, grabDY: p.y - box.y };
+          this.drag = { kind: 'move', track: sel, grabDX: p.x - box.x, grabDY: p.y - box.y };
           return;
         }
       }
 
-      // 3) 빈 곳 → 새 수동 박스 생성 시작
-      this.drag = { kind: 'create', startX: p.x, startY: p.y, box: { x: p.x, y: p.y, w: 0, h: 0 } };
+      // 3) 그 외 → 생성 드래그 시작. 드래그 없이 탭으로 끝나면 아래 트랙을 선택한다.
+      //    (탭 판정용 히트 트랙: 수동 우선, 판정은 눈에 보이는 가림 영역 기준)
+      let hitTrackId: string | null = null;
+      const ordered = [...project.tracks].sort((a, b) => (a.origin === 'manual' ? -1 : 1) - (b.origin === 'manual' ? -1 : 1));
+      for (const track of ordered) {
+        if (!track.enabled) continue;
+        if (this.hitBox(track, p, t)) {
+          hitTrackId = track.id;
+          break;
+        }
+      }
+      this.drag = { kind: 'create', startX: p.x, startY: p.y, box: { x: p.x, y: p.y, w: 0, h: 0 }, hitTrackId };
     });
 
     this.overlay.addEventListener('pointermove', (e) => {
@@ -444,13 +437,17 @@ export class Player {
       if (!this.drag) return;
       if (this.drag.kind === 'create') {
         const b = this.drag.box;
+        const hitTrackId = this.drag.hitTrackId;
         this.drag = null;
         if (b.w > 0.01 && b.h > 0.01) {
+          // 실제 드래그 → 아래에 무엇이 있든 새 박스 (겹침 레이어 자동)
           this.createManualTrack(b);
-          // 박스가 실제로 만들어지면 추가 모드는 1회로 종료
-          if (this.addBoxMode) this.setAddBoxMode(false);
-        } else if (!this.addBoxMode) {
-          // 클릭만 한 경우: 선택 해제 (추가 모드에서는 모드 유지)
+        } else if (hitTrackId) {
+          // 탭 → 아래 박스 선택
+          this.state.selectedTrackId = hitTrackId;
+          this.state.emit('selection');
+        } else {
+          // 빈 곳 탭 → 선택 해제
           this.state.selectedTrackId = null;
           this.state.emit('selection');
         }

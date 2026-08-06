@@ -77,12 +77,6 @@ const M = {
   nothingToUndo: { ko: '되돌릴 작업이 없습니다', en: 'Nothing to undo' },
   redone: { ko: '다시 실행했습니다', en: 'Redone' },
   nothingToRedo: { ko: '다시 실행할 작업이 없습니다', en: 'Nothing to redo' },
-  addBox: { ko: '+ 박스', en: '+ Box' },
-  addBoxTip: {
-    ko: '기존 가림 위에도 새 박스를 겹쳐 그립니다 (B)',
-    en: 'Draw a new box even over existing covers (B)',
-  },
-  addBoxHint: { ko: '화면에서 드래그해 새 박스를 그리세요', en: 'Drag on the frame to draw a new box' },
   trackFace: { ko: '얼굴 추적', en: 'Track face' },
   trackFaceTip: {
     ko: '선택한 수동 박스의 대상을 구간 동안 자동으로 따라갑니다',
