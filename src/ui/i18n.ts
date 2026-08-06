@@ -33,7 +33,9 @@ export function setLang(next: Lang): void {
 
 const M = {
   open: { ko: '영상·사진 열기', en: 'Open video/photo' },
-  support: { ko: '후원', en: 'Support' },
+  // ︎(VS15)는 컬러 이모지 대신 흑백 글리프를 강제한다 — DESIGN.md §8.
+  // 편집기에서 사라지기 쉬운 보이지 않는 문자라 이스케이프로 적는다.
+  support: { ko: '☕\uFE0E 후원', en: '☕\uFE0E Support' },
   supportTip: {
     ko: '이 도구가 도움이 됐다면 제작자를 후원해 주세요 (새 창)',
     en: 'If this tool helped you, consider supporting the developer (opens new tab)',
