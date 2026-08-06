@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- DESIGN.md §8 앱 아이콘: 흰 배경 + 검정 라운드 베젤 + 중앙 파랑 원 -->
+  <rect width="64" height="64" fill="#ffffff"/>
+  <rect x="6" y="6" width="52" height="52" rx="8" fill="none" stroke="#141414" stroke-width="4"/>
+  <circle cx="32" cy="32" r="10" fill="#1f6bff"/>
+</svg>

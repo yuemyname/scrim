@@ -5,8 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy"
           content="default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'" />
-    <title>scrim — 영상 얼굴 비식별화</title>
-    <link rel="icon" href="data:," />
+    <title>scrim — 영상·사진 얼굴 비식별화</title>
+    <meta name="description" content="브라우저 안에서만 동작하는 영상·사진 얼굴 비식별화 도구. 업로드 없음, 서버 없음 — 파일은 기기를 떠나지 않습니다." />
+    <meta name="theme-color" content="#f4f4f2" />
+    <!-- Safari는 SVG 파비콘을 지원하지 않는다 — PNG를 먼저, SVG는 지원 브라우저용 -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <!-- iPad 홈 화면 추가용 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="scrim" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
