@@ -41,3 +41,7 @@ jobs:
           path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Pages 배포 큐가 밀리면 기본 10분으로는 부족할 때가 있다 (빌드는 이미
+          # 끝났고 GitHub 쪽 처리만 남은 상태라 더 기다리는 편이 낫다)
+          timeout: 1200000
