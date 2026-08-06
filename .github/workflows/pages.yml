@@ -10,9 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# 진행 중인 배포는 취소하지 않는다 — Pages 배포를 중간에 취소하면 다음 실행이
+# deployment_queued 상태로 묶여 타임아웃되는 일이 생긴다 (GitHub 권장 설정).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
