@@ -188,7 +188,10 @@ const M = {
     ko: '블러는 반경이 작으면 복원될 수 있어 최소 강도가 강제됩니다',
     en: 'Weak blur can be reversed — a minimum strength is enforced',
   },
-  stickerTip: { ko: '모자이크 바탕 위에 이모지/문구를 얹습니다', en: 'Places an emoji/text over a mosaic base' },
+  stickerTip: {
+    ko: '이모지/문구가 영역을 덮습니다 (바탕은 평균색 면)',
+    en: 'Emoji/text covers the area (flat average-color base)',
+  },
   ellipse: { ko: '타원', en: 'Ellipse' },
   rect: { ko: '사각', en: 'Rect' },
   resetBatch: { ko: '선택 트랙들 전체 스타일로 되돌리기', en: 'Reset selected to global style' },
