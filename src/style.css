@@ -15,6 +15,9 @@
   --signal-green: #28c840; /* 진행 신호 */
 
   --font-mono: 'SF Mono', 'Menlo', 'Consolas', 'Roboto Mono', monospace;
+
+  /* 한 라인에 놓이는 컨트롤(버튼/셀렉트/LCD 칩)의 공통 높이 */
+  --ctrl-h: 28px;
 }
 
 @keyframes recblink {
@@ -55,7 +58,11 @@ button {
   background: #f7f7f7;
   border: 1px solid var(--line);
   border-radius: 3px;
-  padding: 6px 10px;
+  height: var(--ctrl-h);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 button:hover {
@@ -81,12 +88,15 @@ button.primary {
   font-variant-numeric: tabular-nums;
 }
 
-/* LCD 칩 — 수치·상태 표시 */
+/* LCD 칩 — 수치·상태 표시. 버튼과 같은 라인 높이 */
 .lcd {
   background: var(--lcd-bg);
   color: var(--lcd-fg);
   border-radius: 3px;
-  padding: 3px 8px;
+  height: var(--ctrl-h);
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
   font-variant-numeric: tabular-nums;
 }
 
@@ -163,7 +173,8 @@ select {
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 3px;
-  padding: 5px 8px;
+  height: var(--ctrl-h);
+  padding: 0 8px;
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -209,7 +220,8 @@ select {
 .player-wrap .box-delete {
   position: absolute;
   z-index: 5;
-  padding: 4px 10px;
+  height: 24px;
+  padding: 0 10px;
   font-size: 11px;
   background: rgba(255, 255, 255, 0.92);
   border-color: var(--accent);
@@ -259,7 +271,8 @@ select {
   display: none;
 }
 .batch-bar button {
-  padding: 3px 10px;
+  height: 24px;
+  padding: 0 10px;
   font-size: 11px;
 }
 .track-list li {
@@ -300,7 +313,8 @@ select {
   text-transform: uppercase;
 }
 .track-list li .track-delete {
-  padding: 2px 8px;
+  height: 22px;
+  padding: 0 8px;
   font-size: 11px;
   border: none;
   background: transparent;
@@ -343,7 +357,8 @@ select {
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 3px;
-  padding: 5px 8px;
+  height: var(--ctrl-h);
+  padding: 0 8px;
   font-family: var(--font-mono);
   min-width: 0;
 }
@@ -351,7 +366,7 @@ select {
   flex-wrap: wrap;
 }
 .sticker-presets button {
-  padding: 4px 8px;
+  padding: 0 8px;
   font-size: 16px;
 }
 .style-panel input[type='range'] {
@@ -360,6 +375,7 @@ select {
 }
 .seg {
   display: flex;
+  height: var(--ctrl-h);
   border: 1px solid var(--line);
   border-radius: 3px;
   overflow: hidden;
@@ -367,9 +383,10 @@ select {
 }
 .seg button {
   flex: 1;
+  height: 100%;
   border: none;
   border-radius: 0;
-  padding: 5px 0;
+  padding: 0;
   background: transparent;
   color: var(--dim);
 }
@@ -398,7 +415,10 @@ select {
   background: var(--lcd-bg);
   color: var(--lcd-fg);
   border-radius: 3px;
-  padding: 3px 8px;
+  height: var(--ctrl-h);
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
   font-variant-numeric: tabular-nums;
 }
 .transport .time b {
@@ -413,7 +433,10 @@ select {
   background: var(--lcd-bg);
   color: var(--lcd-fg);
   border-radius: 3px;
-  padding: 3px 8px;
+  height: var(--ctrl-h);
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   animation: recblink 1s steps(1) infinite;
