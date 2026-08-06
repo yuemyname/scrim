@@ -8,8 +8,16 @@
     <title>scrim — 영상·사진 얼굴 비식별화</title>
     <meta name="description" content="브라우저 안에서만 동작하는 영상·사진 얼굴 비식별화 도구. 업로드 없음, 서버 없음 — 파일은 기기를 떠나지 않습니다." />
     <meta name="theme-color" content="#f4f4f2" />
-    <!-- Safari는 SVG 파비콘을 지원하지 않는다 — PNG를 먼저, SVG는 지원 브라우저용 -->
+    <!-- 파비콘. 브라우저가 암묵적으로 찾는 /favicon.ico는 **오리진 루트**로
+         요청되는데 이 앱은 서브패스(/scrim/)에 배포되므로 404가 난다 —
+         .ico를 명시 선언해야 탭 아이콘이 잡힌다.
+         Safari는 SVG 파비콘을 지원하지 않으므로 .ico/PNG를 먼저 두고,
+         SVG는 지원 브라우저가 알아서 우선 사용하도록 마지막에 둔다.
+         아이콘 원본은 icon.svg이며 래스터는 scripts/gen-icons.py로 생성한다. -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <!-- iPad 홈 화면 추가용 (PWA) -->
     <link rel="manifest" href="/manifest.webmanifest" />

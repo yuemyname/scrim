@@ -41,3 +41,7 @@
 - 변경 후 `pnpm exec tsc --noEmit && pnpm lint && pnpm build` 통과 필수.
 - 푸시하면 GitHub Pages로 자동 배포된다 (`.github/workflows/pages.yml`).
 - 모델/wasm 등 고정 경로 자산을 바꾸면 캐시 무효화(`?v=__BUILD_ID__`)를 확인할 것.
+- 파비콘 래스터(`public/favicon*.png`, `favicon.ico`)는 손으로 고치지 말고
+  `pnpm gen:icons`로 다시 만든다. 원본은 `public/icon.svg`.
+- 서브패스(`/scrim/`) 배포라 아이콘·매니페스트는 반드시 Vite가 base를 붙이는
+  경로로 선언할 것 — 오리진 루트로 나가는 암묵적 `/favicon.ico`는 404다.

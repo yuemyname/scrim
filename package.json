@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint src",
-    "vendor:models": "node scripts/vendor-models.mjs"
+    "vendor:models": "node scripts/vendor-models.mjs",
+    "gen:icons": "python3 scripts/gen-icons.py"
   },
   "dependencies": {
     "mp4-muxer": "^5.1.5",
