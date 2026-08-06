@@ -103,6 +103,7 @@ class App {
   private minConfidence = 0.35;
   private rendering = false;
   private player: Player | null = null;
+  private timeline: Timeline | null = null;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -217,12 +218,15 @@ class App {
             lastProgressAt = performance.now();
             progress.update(p);
           });
+      this.state.resetForNewMedia();
       this.state.isImage = isImage;
       this.state.file = file;
       this.state.project = project;
       this.state.frames = frames;
       this.state.currentUs = 0;
       this.state.phase = 'review';
+      this.state.manualSeq = maxManualSeq(project.tracks);
+      this.exportChoice = 'unset'; // 해상도 선택은 미디어별 — 이전 선택을 넘기지 않는다
 
       if (project.source.durationUs > LONG_VIDEO_WARN_US) {
         toast(t('longVideoWarn'));
@@ -264,6 +268,10 @@ class App {
     const project = state.project;
     const file = state.file;
     if (!project || !file) return;
+
+    // 이전 화면 정리: 리스너·이전 미디어 재생·blob URL이 남지 않게
+    state.clearListeners();
+    this.player?.dispose();
 
     this.root.innerHTML = '';
 
@@ -411,6 +419,7 @@ class App {
     }
 
     const timeline = new Timeline(state);
+    this.timeline = timeline;
     timeline.onHazardCountChange = (count) => {
       if (count > 0) {
         hazardCount.classList.remove('clear');
@@ -431,15 +440,20 @@ class App {
     timeline.draw();
     state.emit('project');
 
-    this.bindKeyboard(player, timeline);
+    this.bindKeyboard();
   }
 
   private keyboardBound = false;
-  private bindKeyboard(player: Player, timeline: Timeline): void {
+  /** 한 번만 바인딩하되, 항상 "현재" Player/Timeline을 참조한다 —
+   *  인스턴스를 캡처하면 새 미디어를 연 뒤 이전(화면에서 사라진) 영상이 조작된다 */
+  private bindKeyboard(): void {
     if (this.keyboardBound) return;
     this.keyboardBound = true;
     window.addEventListener('keydown', (e) => {
       if (this.state.phase !== 'review') return;
+      const player = this.player;
+      const timeline = this.timeline;
+      if (!player || !timeline) return;
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
 

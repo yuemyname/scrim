@@ -47,6 +47,12 @@ export class AppState {
     for (const fn of this.listeners.get(event) ?? []) fn();
   }
 
+  /** 리뷰 화면을 다시 만들기 직전에 호출 — 이전 화면(Player/Timeline/Sidebar)이
+   *  등록한 리스너를 모두 제거해 사라진 DOM에 대한 갱신·누수를 막는다 */
+  clearListeners(): void {
+    this.listeners.clear();
+  }
+
   private snapshot(): Snapshot {
     return {
       tracks: structuredClone(this.project!.tracks),
@@ -87,6 +93,17 @@ export class AppState {
     if (this.undoStack.length > UNDO_DEPTH) this.undoStack.shift();
     this.restore(snap);
     return true;
+  }
+
+  /** 새 미디어를 열 때 이전 미디어의 편집 컨텍스트를 모두 비운다.
+   *  특히 undo 스택은 반드시 비워야 한다 — 남겨두면 새 미디어 위에
+   *  이전 미디어의 트랙이 복원되는 사고가 난다. */
+  resetForNewMedia(): void {
+    this.selectedTrackId = null;
+    this.checkedIds.clear();
+    this.playing = false;
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
   }
 
   selectedTrack(): Track | null {

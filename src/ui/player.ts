@@ -177,6 +177,19 @@ export class Player {
     );
   }
 
+  /** 화면 교체 시 호출 — 재생을 멈추고 blob URL·옵저버를 해제한다.
+   *  안 하면 이전 미디어가 백그라운드에서 계속 재생/유지될 수 있다. */
+  dispose(): void {
+    this.video.pause();
+    this.video.removeAttribute('src');
+    if (this.videoUrl) {
+      URL.revokeObjectURL(this.videoUrl);
+      this.videoUrl = null;
+    }
+    this.stageObserver?.disconnect();
+    this.stageObserver = null;
+  }
+
   togglePlay(): void {
     if (this.imageMode) return;
     if (this.video.paused) void this.video.play();
