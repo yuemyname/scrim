@@ -14,15 +14,18 @@ import { computeStrip, hazardSegments, nextHazard, nearestIndex, type StripData 
 import { trackColor } from './colors';
 import { t } from './i18n';
 
+// DESIGN.md 라이트 팔레트 — 컬러 없이 명도 대비로만 상태를 구분한다.
+// 해저드 사선만 액센트 검정/흰색 교차로 강하게 (반전 = 경고).
 const COLORS = {
-  bg: '#1F1F26',
-  line: '#32323C',
-  detected: '#6E6E78',
-  held: '#3E3E48',
-  hazard: '#FFD400',
-  manual: '#E8E6E1',
-  playhead: '#E8E6E1',
-  range: 'rgba(232,230,225,0.25)',
+  bg: '#ececec',
+  detected: '#9a9a9a',
+  held: '#cfcfcf',
+  hazard: '#141414',
+  hazardAlt: '#ffffff',
+  cut: '#9a9a9a',
+  cutTip: '#141414',
+  manual: '#141414',
+  playhead: '#141414',
 };
 
 export class Timeline {
@@ -144,13 +147,12 @@ export class Timeline {
 
     // 장면 전환(컷) 마커 — 구간 길이를 조정할 때 컷 위치를 보고 맞출 수 있게
     const cuts = this.state.frames?.cutsUs ?? [];
-    ctx.fillStyle = COLORS.line;
     for (const c of cuts) {
       const x = (c / dur) * W;
+      ctx.fillStyle = COLORS.cut;
       ctx.fillRect(x - 0.5, 0, 1, H);
-      ctx.fillStyle = COLORS.detected;
+      ctx.fillStyle = COLORS.cutTip;
       ctx.fillRect(x - 0.5, 0, 1, H * 0.3);
-      ctx.fillStyle = COLORS.line;
     }
 
     // 선택 트랙 구간 바 + 양끝 핸들 (트랙 색상, 드래그 중엔 확대·강조)
@@ -218,8 +220,8 @@ export class Timeline {
         if (strip.manual[i]) hasManual = true;
       }
       if (hasHazard) {
-        // 해저드 사선: 4px 주기 스트라이프
-        ctx.fillStyle = (x >> 2) % 2 === 0 ? COLORS.hazard : '#4A4008';
+        // 해저드 사선: 4px 주기 스트라이프 (액센트/흰색 반전 — 컬러 없이 경고)
+        ctx.fillStyle = (x >> 2) % 2 === 0 ? COLORS.hazard : COLORS.hazardAlt;
         ctx.fillRect(x, 0, 1, blockH);
       } else if (hasDetected) {
         ctx.fillStyle = COLORS.detected;

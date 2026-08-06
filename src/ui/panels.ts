@@ -205,7 +205,7 @@ export class Sidebar {
 
     const target = document.createElement('div');
     target.className = 'row';
-    target.style.color = 'var(--ink-muted)';
+    target.style.color = 'var(--dim)';
     target.textContent = isBatch
       ? t('batchEditing', { n: checked.length })
       : sel

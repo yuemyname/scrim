@@ -1,16 +1,26 @@
-/* scrim — 계측 도구처럼 보여야 한다. 라운드 2px, 그림자 없음, 색은 경고 하나에만. */
+/* scrim — DESIGN.md(null8) 적용: 흰 종이 위에 떠 있는 모노크롬 계측 장비.
+   컬러는 신호로만 (파랑 #1f6bff 확정 / 초록 #28c840 진행). 상태는 반전과 점멸로 말한다. */
 
 :root {
-  --surface: #16161A;
-  --panel: #1F1F26;
-  --line: #32323C;
-  --ink: #E8E6E1;
-  --ink-muted: #8A8A93;
-  --hazard: #FFD400; /* 미검증 구간 사선. 다른 어디에도 쓰지 않는다 */
+  --bg: #f4f4f2; /* 페이지 배경 — 순백이 아닌 웜 오프화이트 */
+  --panel: #ffffff; /* 패널/유닛 내부 */
+  --panel2: #ececec; /* 보조 패널, 트랙 */
+  --line: #dcdcdc; /* 구분선, 버튼 테두리 */
+  --accent: #141414; /* 베젤, 액센트, 활성 상태 — "검정이 곧 액센트" */
+  --ink: #222222; /* 본문 텍스트 */
+  --dim: #9a9a9a; /* 보조 라벨 */
+  --lcd-bg: #141414;
+  --lcd-fg: #f5f5f5;
+  --signal-blue: #1f6bff; /* 확정 신호 */
+  --signal-green: #28c840; /* 진행 신호 */
 
-  --font-ui: 'Pretendard', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
-    'Malgun Gothic', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Mono', ui-monospace, monospace;
+  --font-mono: 'SF Mono', 'Menlo', 'Consolas', 'Roboto Mono', monospace;
+}
+
+@keyframes recblink {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 * {
@@ -25,10 +35,10 @@ body {
 }
 
 body {
-  background: var(--surface);
+  background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   overflow: hidden;
 }
 
@@ -39,32 +49,31 @@ body {
 }
 
 button {
-  font-family: var(--font-ui);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   color: var(--ink);
-  background: var(--panel);
+  background: #f7f7f7;
   border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 6px 14px;
+  border-radius: 3px;
+  padding: 6px 10px;
   cursor: pointer;
 }
 button:hover {
-  border-color: var(--ink-muted);
+  border-color: var(--dim);
+}
+button:active {
+  background: #e4e4e4;
 }
 button:disabled {
   opacity: 0.45;
   cursor: default;
 }
-button.on {
-  background: var(--ink);
-  color: var(--surface);
-  border-color: var(--ink);
-}
+/* 활성/켜짐 = 반전 */
+button.on,
 button.primary {
-  background: var(--ink);
-  color: var(--surface);
-  border-color: var(--ink);
-  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 .mono {
@@ -72,14 +81,37 @@ button.primary {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── 헤더 ─────────────────────────────── */
+/* LCD 칩 — 수치·상태 표시 */
+.lcd {
+  background: var(--lcd-bg);
+  color: var(--lcd-fg);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 헤더 (타이틀바) ───────────────────── */
 .topbar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
   flex: none;
+}
+/* 그레이 신호등 3점 */
+.topbar::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c9c9c9;
+  box-shadow:
+    16px 0 0 #ababab,
+    32px 0 0 #8a8a8a;
+  margin-right: 32px;
 }
 .topbar > .brand {
   margin-right: auto;
@@ -92,7 +124,7 @@ button.primary {
 .topbar .brand {
   font-weight: 700;
   letter-spacing: 0.02em;
-  font-size: 15px;
+  font-size: 13px;
 }
 
 /* ── 랜딩 ─────────────────────────────── */
@@ -108,30 +140,32 @@ button.primary {
 .dropzone {
   width: min(560px, 90%);
   padding: 64px 32px;
+  background: var(--panel);
   border: 1px dashed var(--line);
-  border-radius: 2px;
+  border-radius: 3px;
   text-align: center;
-  color: var(--ink-muted);
+  color: var(--dim);
   cursor: pointer;
   line-height: 1.7;
 }
 .dropzone.dragover {
-  border-color: var(--ink);
+  border-color: var(--accent);
   color: var(--ink);
 }
 .landing .options {
   display: flex;
   gap: 10px;
   align-items: center;
-  color: var(--ink-muted);
+  color: var(--dim);
 }
 select {
-  background: var(--panel);
+  background: #f7f7f7;
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 3px;
   padding: 5px 8px;
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 /* ── 메인 레이아웃 ─────────────────────── */
@@ -149,11 +183,14 @@ select {
   min-height: 0;
   position: relative;
   overflow: hidden;
-  background: #0E0E11;
+  background: var(--bg);
 }
-/* 크기는 JS(fitToStage)가 스테이지에 맞춰 지정한다 — 세로 영상이 하단 바를 덮지 않게 */
+/* TV 유닛: 스크린을 장비처럼 감싼다. 크기는 JS(fitToStage)가 지정 */
 .player-wrap {
   position: relative;
+  background: #000;
+  border: 2px solid var(--accent);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
 }
 .player-wrap video {
   display: block;
@@ -173,9 +210,9 @@ select {
   position: absolute;
   z-index: 5;
   padding: 4px 10px;
-  font-size: 12px;
-  background: rgba(22, 22, 26, 0.9);
-  border-color: var(--ink-muted);
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--accent);
 }
 
 /* ── 사이드바 ─────────────────────────── */
@@ -189,10 +226,11 @@ select {
   overflow: hidden;
 }
 .sidebar h2 {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.1em;
-  color: var(--ink-muted);
+  text-transform: uppercase;
+  color: var(--dim);
   padding: 14px 14px 8px;
 }
 /* 트랙이 많아지면 목록만 스크롤 — STYLE 패널은 항상 보인다 */
@@ -206,7 +244,7 @@ select {
   flex: none;
   width: 15px;
   height: 15px;
-  accent-color: var(--ink);
+  accent-color: var(--accent);
 }
 .batch-bar {
   display: flex;
@@ -214,15 +252,15 @@ select {
   align-items: center;
   gap: 6px;
   padding: 4px 14px 8px;
-  color: var(--ink-muted);
-  font-size: 12px;
+  color: var(--dim);
+  font-size: 11px;
 }
 .batch-bar:empty {
   display: none;
 }
 .batch-bar button {
   padding: 3px 10px;
-  font-size: 12px;
+  font-size: 11px;
 }
 .track-list li {
   display: flex;
@@ -233,38 +271,40 @@ select {
   border-left: 2px solid transparent;
 }
 .track-list li.selected {
-  background: var(--surface);
-  border-left-color: var(--ink);
+  background: var(--panel2);
+  border-left-color: var(--accent);
 }
 .track-list li .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 1.5px solid var(--ink-muted);
+  border: 1.5px solid var(--dim);
   flex: none;
 }
 .track-list li.enabled .dot {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .track-list li .tid {
   width: 32px;
 }
 .track-list li .range {
-  color: var(--ink-muted);
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10px;
 }
 .track-list li .origin-tag {
   margin-left: auto;
-  color: var(--ink-muted);
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 .track-list li .track-delete {
   padding: 2px 8px;
   font-size: 11px;
   border: none;
   background: transparent;
-  color: var(--ink-muted);
+  color: var(--dim);
   flex: none;
 }
 .track-list li .track-delete:hover {
@@ -272,12 +312,13 @@ select {
 }
 .empty-note {
   padding: 6px 14px;
-  color: var(--ink-muted);
+  color: var(--dim);
   line-height: 1.6;
 }
 
 .style-panel {
   padding: 4px 14px 16px;
+  border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -292,17 +333,18 @@ select {
 }
 .style-panel label {
   width: 44px;
-  color: var(--ink-muted);
+  color: var(--dim);
+  font-size: 10px;
   flex: none;
 }
 .style-panel .sticker-input {
   flex: 1;
-  background: var(--surface);
+  background: #f7f7f7;
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 3px;
   padding: 5px 8px;
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   min-width: 0;
 }
 .sticker-presets {
@@ -314,12 +356,12 @@ select {
 }
 .style-panel input[type='range'] {
   flex: 1;
-  accent-color: var(--ink);
+  accent-color: var(--accent);
 }
 .seg {
   display: flex;
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
   flex: 1;
 }
@@ -329,16 +371,17 @@ select {
   border-radius: 0;
   padding: 5px 0;
   background: transparent;
-  color: var(--ink-muted);
+  color: var(--dim);
 }
 .seg button.on {
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--accent);
+  color: #fff;
 }
 
-/* ── 하단 컨트롤/타임라인 ───────────────── */
+/* ── 하단 컨트롤/타임라인 (컨트롤 바) ────── */
 .bottombar {
   flex: none;
+  background: var(--panel);
   border-top: 1px solid var(--line);
   padding: 10px 16px 12px;
   display: flex;
@@ -350,22 +393,35 @@ select {
   align-items: center;
   gap: 12px;
 }
+/* 타임코드 = LCD 칩 */
 .transport .time {
-  color: var(--ink-muted);
+  background: var(--lcd-bg);
+  color: var(--lcd-fg);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-variant-numeric: tabular-nums;
 }
 .transport .time b {
-  color: var(--ink);
+  color: #fff;
   font-weight: 500;
 }
 .transport .spacer {
   flex: 1;
 }
+/* 미검증 카운터: LCD 칩 + 1s 스텝 점멸(경고). 해소되면 dim 텍스트 */
 .hazard-count {
-  color: var(--hazard);
-  font-size: 12px;
+  background: var(--lcd-bg);
+  color: var(--lcd-fg);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  animation: recblink 1s steps(1) infinite;
 }
 .hazard-count.clear {
-  color: var(--ink-muted);
+  background: transparent;
+  color: var(--dim);
+  animation: none;
 }
 .timeline-stack {
   display: flex;
@@ -376,7 +432,8 @@ canvas.timeline,
 canvas.strip {
   width: 100%;
   display: block;
-  border-radius: 2px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
   touch-action: none;
 }
 canvas.timeline {
@@ -387,15 +444,16 @@ canvas.strip {
   height: 16px;
 }
 .strip-hint {
-  color: var(--ink-muted);
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10px;
 }
 .strip-hint kbd {
   font-family: var(--font-mono);
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 3px;
   padding: 0 4px;
-  font-size: 10px;
+  font-size: 9px;
+  background: #f7f7f7;
 }
 
 /* ── 푸터 ─────────────────────────────── */
@@ -403,12 +461,13 @@ canvas.strip {
   flex: none;
   text-align: center;
   padding: 6px;
+  background: var(--panel);
   border-top: 1px solid var(--line);
-  color: var(--ink-muted);
-  font-size: 11px;
+  color: var(--dim);
+  font-size: 10px;
 }
 .privacy-footer a {
-  color: var(--ink-muted);
+  color: var(--dim);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -417,7 +476,7 @@ canvas.strip {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(20, 20, 20, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,18 +484,19 @@ canvas.strip {
 }
 .modal {
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 2px;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
   padding: 24px;
   width: min(440px, 90vw);
   line-height: 1.7;
 }
 .modal h3 {
   margin-bottom: 12px;
-  font-size: 14px;
+  font-size: 13px;
 }
 .modal p {
-  color: var(--ink-muted);
+  color: var(--dim);
   margin-bottom: 10px;
 }
 .modal .actions {
@@ -447,40 +507,44 @@ canvas.strip {
 }
 .progress-track {
   height: 4px;
-  background: var(--surface);
-  border-radius: 2px;
+  background: var(--panel2);
+  border-radius: 3px;
   overflow: hidden;
   margin: 14px 0 6px;
 }
+/* 로딩 = 0.8s 스텝 점멸 */
 .progress-fill {
   height: 100%;
-  background: var(--ink);
+  background: var(--accent);
   width: 0%;
+  animation: recblink 0.8s steps(1) infinite;
 }
 .toast {
   position: fixed;
   bottom: 48px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 2px;
+  background: var(--lcd-bg);
+  color: var(--lcd-fg);
+  border: none;
+  border-radius: 3px;
   padding: 8px 16px;
   z-index: 200;
 }
 .warn-banner {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-left: 2px solid var(--hazard);
+  border-left: 2px solid var(--accent);
   padding: 8px 12px;
   margin: 0 16px;
-  color: var(--ink-muted);
-  font-size: 12px;
+  color: var(--dim);
+  font-size: 11px;
 }
 
-/* 모션은 검증 스트립 점프 시 플레이헤드 이동 하나만 */
+/* 모션: 상태 점멸 + 검증 스트립 점프 플레이헤드 이동만 */
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
   }
 }

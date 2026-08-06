@@ -286,12 +286,14 @@ export class Player {
       }
     }
 
-    // 생성 중인 드래그 박스
+    // 생성 중인 드래그 박스 — DESIGN.md §7: 조정 중 = 흰색 점선
     if (this.drag?.kind === 'create') {
       const b = this.drag.box;
-      this.ctx.strokeStyle = '#E8E6E1';
+      this.ctx.strokeStyle = '#FFFFFF';
       this.ctx.lineWidth = 1.5;
+      this.ctx.setLineDash([6, 4]);
       this.ctx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+      this.ctx.setLineDash([]);
     }
   }
 
