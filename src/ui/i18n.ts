@@ -36,7 +36,8 @@ const M = {
   // 컬러 이모지 그대로 노출한다 (VS15로 흑백화하지 않음) — DESIGN.md §8
   // 이모지 규칙의 확정된 예외. U+2615는 기본이 이모지 프레젠테이션이라
   // 변이 선택자 없이도 애플 커피 이모지로 렌더링된다.
-  support: { ko: '☕ 후원', en: '☕ Support' },
+  // 라벨은 두 언어 모두 'coffee'로 통일한다.
+  support: { ko: '☕ coffee', en: '☕ coffee' },
   supportTip: {
     ko: '이 도구가 도움이 됐다면 제작자를 후원해 주세요 (새 창)',
     en: 'If this tool helped you, consider supporting the developer (opens new tab)',
