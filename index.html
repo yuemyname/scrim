@@ -11,14 +11,14 @@
     <!-- 파비콘. 브라우저가 암묵적으로 찾는 /favicon.ico는 **오리진 루트**로
          요청되는데 이 앱은 서브패스(/scrim/)에 배포되므로 404가 난다 —
          .ico를 명시 선언해야 탭 아이콘이 잡힌다.
-         Safari는 SVG 파비콘을 지원하지 않으므로 .ico/PNG를 먼저 두고,
-         SVG는 지원 브라우저가 알아서 우선 사용하도록 마지막에 둔다.
+         **래스터만 선언한다.** Safari(WebKit)는 rel=icon의 SVG를 렌더링하지
+         못하는데, 아이콘이 여럿이면 마지막 선언을 고르는 브라우저가 있어
+         SVG를 같이 두면 Safari 탭이 빈 채로 남는다. 실제로 그렇게 나왔다.
          아이콘 원본은 icon.svg이며 래스터는 scripts/gen-icons.py로 생성한다. -->
-    <link rel="icon" href="/favicon.ico?v=__BUILD_ID__" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/favicon.ico?v=__BUILD_ID__" sizes="any" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=__BUILD_ID__" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=__BUILD_ID__" />
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png?v=__BUILD_ID__" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg?v=__BUILD_ID__" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=__BUILD_ID__" />
     <!-- iPad 홈 화면 추가용 (PWA) -->
     <link rel="manifest" href="/manifest.webmanifest?v=__BUILD_ID__" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=__BUILD_ID__" />
