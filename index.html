@@ -12,6 +12,12 @@
          암묵적으로 찾는 /favicon.ico는 오리진 루트로 요청되어 404다.
          Safari 탭 아이콘이 계속 비어서 관례적인 최소 형태만 남긴다:
           - SVG(rel=icon)는 WebKit이 렌더링하지 못하므로 선언하지 않는다
+          - **.ico도 선언하지 않는다.** 크롬은 PNG를 골라 정상 표시되는데
+            Safari만 비어 있었다 — Safari가 .ico를 고르고 디코드하지 못하는
+            것으로 보인다. 이 .ico는 빌드 환경에 이미지 도구가 없어 손으로
+            바이트를 조립한 파일이라 가장 의심스럽다. PNG는 Safari 12+를
+            포함해 모든 대상 브라우저가 지원하므로 잃는 것이 없다
+            (public/favicon.ico 파일 자체는 보관만 한다)
           - 링크가 여럿이면 마지막을 고르는 구현이 있어 개수를 줄인다
           - 버전 쿼리(?v=)를 붙이지 않는다. 파비콘 요청은 페이지 fetch와
             경로가 달라(브라우저 프로세스가 직접 받는다) 쿼리가 붙은 URL에서
@@ -19,8 +25,8 @@
             오래 캐시해 ?v=로는 갱신되지 않는다.
             → 아이콘 그림이 바뀌면 파일명을 바꿔 캐시를 무효화할 것.
          원본은 icon.svg이며 래스터는 `pnpm gen:icons`로 생성한다. -->
-    <link rel="icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <!-- iPad 홈 화면 추가용 (PWA) -->
     <link rel="manifest" href="/manifest.webmanifest?v=__BUILD_ID__" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
