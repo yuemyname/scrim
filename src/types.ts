@@ -1,9 +1,14 @@
 /** 앱 표시명. 프로젝트명은 package.json의 name과 이 상수만 참조한다. */
 export const APP_NAME = 'scrim';
 
-/** 후원 페이지 링크 (Buy Me a Coffee 등).
- *  빈 문자열이면 후원 버튼이 표시되지 않는다. */
-export const SUPPORT_URL = 'https://buymeacoffee.com/yuemyname';
+/** 후원 페이지 링크 (Ko-fi 등). 빈 문자열이면 후원 버튼이 표시되지 않는다.
+ *
+ *  링크는 클릭했을 때 새 탭으로 이동만 한다 — 페이지 로드 시 외부로 나가는
+ *  요청은 없다. Ko-fi가 제공하는 배너 이미지(storage.ko-fi.com)는 쓰지 않는다:
+ *  외부 오리진 이미지는 페이지 CSP(img-src 'self')가 차단하고, 무엇보다 방문만
+ *  해도 Ko-fi CDN에 IP가 남아 "아무것도 브라우저 밖으로 나가지 않는다"는
+ *  이 앱의 약속이 깨진다. 버튼은 자체 렌더링(`☕ coffee`)을 유지한다. */
+export const SUPPORT_URL = 'https://ko-fi.com/L4U224X239';
 
 /** 정규화 좌표 (0..1). 소스 해상도 변경에 독립적이어야 한다.
  *  좌표계는 항상 "표시 방향"(회전 적용 후) 기준이다. */
